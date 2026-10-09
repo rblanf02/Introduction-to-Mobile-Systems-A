@@ -5,3 +5,5 @@ According to the World Health Organization (WHO), obesity is a chronic disease t
 Target audience: People who spend most of the day sitting (working, studying) and want a low-effort nudge to walk more.
 
 Google Fit tracks users’ steps and physical activity, only allowing them to set goals and monitor their progress. Our app would be different because it would focus on motivating users to walk every day through a streak system, achievable challenges.
+
+MVP: https://canva.link/5gt2xbfyp9ic53v
