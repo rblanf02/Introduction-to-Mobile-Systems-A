@@ -5,3 +5,5 @@ According to the World Health Organization (WHO), obesity is a chronic disease t
 Problem to solve: Nowadays, many people spend a lot of time sitting at a desk or watching TV, which leads to an increase in sedentary behaviour.
 
 Target audience: People who want to improve their health.
+
+Google Fit tracks users’ steps and physical activity, only allowing them to set goals and monitor their progress. Our app would be different because it would focus on motivating users to walk every day through a streak system, achievable challenges.
