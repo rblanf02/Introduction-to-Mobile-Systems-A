@@ -140,26 +140,21 @@ The main goal chosen in Setup orders the suggested challenges (e.g. "Build a str
 |---|---|
 | ViewModel / app state (W5) | `TodayViewModel` exposing `StateFlow<TodayUiState>` |
 | Local persistence (W6) | **Room** for daily records and challenges, **DataStore** for goal, nickname, main goal, mascot and settings |
-| Networking (W7) | Challenge catalogue downloaded from a remote JSON file and cached offline (see section 4) |
+| Networking (W7) | **Not used by the app** — Steppy runs completely locally; the Week 7 requirement is covered by a separate small networking exercise (see section 4) |
 | Device capability (W8) | **Step counter sensor** (`TYPE_STEP_COUNTER`) + `ACTIVITY_RECOGNITION` permission |
 | Permission fallback (W8) | Permission denied / no sensor → **manual step entry** (days marked as "manual") |
 | Notifications (MVP) | Evening reminder: "1,200 steps left to keep your 12-day streak" — `POST_NOTIFICATIONS` on Android 13+; if denied, the app works normally without reminders |
-| Automated tests (W11) | Streak + hearts calculator, XP/level calculator, challenge completion, day-rollover logic, backup encode/decode |
+| Automated tests (W5–W11) | Written alongside each feature from Week 5, completed in Week 11: streak + hearts calculator, XP/level calculator, challenge completion, day-rollover logic, backup encode/decode |
 
 ---
 
 ## 4. Networking — decision
 
-Sharing and the friend leaderboard are **out of scope**, so the app no longer needs a backend. The course still requires a network interaction in Week 7.
+**Decision: Steppy runs completely locally.** Sharing and the friend leaderboard are out of scope, so there is no backend, no remote data and no `INTERNET` permission.
 
-**Proposal:** the list of available challenges is downloaded from a small remote JSON file (e.g. hosted in the GitHub repository) and cached in Room.
-- Meaningful: new challenges can be added without updating the app.
-- Must handle loading, offline, error, and stale data ("challenges last updated 2 days ago").
-- Fallback: a built-in default challenge list if the download has never succeeded.
-
-**Alternative:** if this proves unnecessary, complete a separate small networking exercise, as the course allows.
-
-**Decision deadline:** Week 4 (M1), presented as a project risk.
+- The challenge catalogue is **built into the app** (a bundled list), so it always works offline.
+- The course still asks for a network interaction in Week 7 → we complete a **separate small networking exercise**, as the course allows, outside the Steppy app.
+- Benefit for privacy and the demo: the app behaves the same with or without a connection (airplane mode changes nothing).
 
 ---
 
@@ -172,8 +167,7 @@ Sharing and the friend leaderboard are **out of scope**, so the app no longer ne
 - Room (daily records, challenges)
 - DataStore (goal, nickname, main goal, mascot, settings)
 - WorkManager (periodic step snapshots, daily reminder)
-- Retrofit or Ktor (challenge catalogue download)
-- kotlinx.serialization (challenge catalogue, backup file, QR payload)
+- kotlinx.serialization (backup file, QR payload)
 - ZXing `core` (QR generation) + Google Code Scanner (QR scanning)
 - Manual dependency injection (no Hilt, to keep it simple)
 
@@ -186,7 +180,7 @@ ViewModels (TodayViewModel, ProgressViewModel, ChallengesViewModel, ...)
    ↓
 Repositories (StepRepository, SettingsRepository, ChallengeRepository, BackupRepository)
    ↓
-Data sources (Room DAO, DataStore, SensorManager, remote JSON)
+Data sources (Room DAO, DataStore, SensorManager, built-in challenge list)
 ```
 
 Domain logic (streak, hearts, XP, level, challenge completion, backup encoding) lives in **pure Kotlin functions** so it can be unit-tested without Android.
@@ -328,7 +322,7 @@ Additional check (mentioned on the "Mobile for Social Good" slide):
 
 - Data collected: daily step counts (total and before noon), goal, username, main goal, activity level, mascot choice, reminder time, challenge progress.
 - No full names, emails, location, weight, or other health data in the MVP.
-- All data stored locally (Room/DataStore); nothing personal is sent over the network (the challenge download is read-only).
+- All data stored locally (Room/DataStore); the app has no network access at all (no `INTERNET` permission).
 - "Backup to file" saves the user's data to a file they choose; nothing is uploaded by the app.
 - "Restore from file" and QR import validate the data first and ask for confirmation before replacing existing data.
 - The QR transfer code contains the user's last 6 months of steps and their progress: it is only shown after the user taps "Transfer", with a note to scan it only with their own phone.
@@ -365,13 +359,13 @@ Found when comparing the "Mobile System" mockup with this plan:
 | 2 | Brief | User group, competitor comparison, 3 user stories, MVP + out-of-scope lists |
 | 3 | Prototype | Canva screens incl. feedback states; accessibility requirements; peer test with another team |
 | 4 | **M1** | Presentation; confirm networking approach |
-| 5 | User journey | Setup → Today → Challenges with fake in-memory steps + ViewModels; first `AI_USE.md` entry |
-| 6 | Local storage | Room + DataStore; data survives restart and rotation; JSON backup / restore |
-| 7 | Networking | Challenge catalogue download; loading/offline/error/retry states |
-| 8 | Sensor & notifications | Real step counter + permission + manual-entry fallback; daily reminder + denial path; tested on a physical phone |
-| 9 | **M2** | Demo including denied permission and airplane mode |
+| 5 | User journey | Setup → Today → Challenges with fake in-memory steps + ViewModels; streak/hearts, XP/level and challenge logic **with unit tests**; first `AI_USE.md` entry |
+| 6 | Local storage | Room + DataStore; data survives restart and rotation; JSON backup / restore; DAO, goal-change and backup round-trip tests |
+| 7 | Networking | Separate small networking exercise (outside the app); built-in challenge catalogue in the app |
+| 8 | Sensor & notifications | Real step counter + permission + manual-entry fallback; daily reminder + denial path; tested on a physical phone; reboot and day-rollover tests |
+| 9 | **M2** | Demo including denied permission and airplane mode (app works fully offline) |
 | 10 | Privacy & security | Data checklist; "Delete my data"; repository and permissions review; QR transfer + payload size check |
-| 11 | Testing | Unit tests (streak, hearts, XP, challenges, rollover, backup encode/decode); manual checklist; one documented bug fix |
+| 11 | Testing | Fill gaps in the unit tests written since Week 5 (edge cases from §5, QR encode/decode); manual checklist; test summary; one documented bug fix |
 | 12 | Usability | 2 anonymised sessions — task: "complete setup and find today's steps and streak" (60 s criterion) |
 | 13 | Refinement | Fixes from usability testing; WorkManager/battery check; feature freeze |
 | 14 | Release | Teammate builds from README; source ZIP; complete `AI_USE.md` and test summary |
@@ -385,7 +379,7 @@ Found when comparing the "Mobile System" mockup with this plan:
 |---|---|---|
 | **A — UI/UX & Accessibility** | Compose screens, navigation, prototype, accessibility requirements, usability sessions | *to assign* |
 | **B — Data & Logic** | Room, DataStore, streak/hearts/XP/challenge logic, backup format, unit tests | *to assign* |
-| **C — Platform & Network** | Step sensor, permissions, WorkManager, notifications, challenge download, QR transfer | *to assign* |
+| **C — Platform & Network** | Step sensor, permissions, WorkManager, notifications, networking exercise, QR transfer | *to assign* |
 
 Every member should contribute to every layer at least once, because the individual code defence covers the whole project.
 
@@ -403,8 +397,8 @@ Every member should contribute to every layer at least once, because the individ
 | RS6 | Transferred streak/XP wrong because old records are missing | `ProgressBaseline` carries XP, streak, hearts and active days from before the window; round-trip unit tests |
 | — | Scope creep (social features, extra screens) | Sharing and leaderboard explicitly out of scope |
 | — | Emulator cannot count steps | Debug "simulate steps" button + one physical Android 10+ phone |
-| — | Day-boundary / reboot bugs | Pure-function logic with unit tests from Week 6 |
-| — | Networking feels artificial | Challenge catalogue gives it a real purpose; separate exercise as fallback |
+| — | Day-boundary / reboot bugs | Pure-function logic with unit tests from Week 5, written alongside each feature |
+| — | Week 7 networking requirement not met by a local-only app | Separate small networking exercise, as the course allows |
 | — | Overclaiming social impact | Claim "motivates users to build a daily walking habit", not "reduces obesity" or "reduces sedentary behaviour" |
 
 ---
