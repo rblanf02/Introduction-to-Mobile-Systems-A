@@ -1,7 +1,7 @@
 package com.steppy.app.platform.sensor
 
 /**
- * Every possible state of step tracking (role C: Platform & Network).
+ * Every possible state of step tracking:
  *
  * It is a sealed interface, so these four cases are the only ones that can exist.
  * When the UI handles it with `when (state)`, the compiler forces it to cover every
