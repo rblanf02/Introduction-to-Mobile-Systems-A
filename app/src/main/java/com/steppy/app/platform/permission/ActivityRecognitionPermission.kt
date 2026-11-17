@@ -1,4 +1,4 @@
-package com.steppy.app.platform.sensor.permission
+package com.steppy.app.platform.permission
 import android.Manifest
 import android.app.Activity
 import android.content.Context

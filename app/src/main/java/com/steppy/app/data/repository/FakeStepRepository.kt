@@ -13,7 +13,7 @@ class FakeStepRepository : StepRepository {
 
     override val state: StateFlow<StepTrackingState> = _state.asStateFlow()
 
-    override suspend fun addManualSteps(steps: Int) {
+    suspend fun addManualSteps(steps: Int) {
         if (steps <= 0) {
             return
         }
