@@ -33,7 +33,8 @@ import java.util.Locale
 fun TodayScreen(
     uiState: SteppyUiState,
     onAddSteps: (Int) -> Unit,
-    onNotificationClick: () -> Unit
+    onNotificationClick: () -> Unit,
+    sensorSection: @Composable () -> Unit = {}
 ) {
     val context = LocalContext.current
     var showManualDialog by remember { mutableStateOf(false) }
@@ -60,6 +61,8 @@ fun TodayScreen(
             mascot = uiState.selectedMascot,
             onNotificationClick = onNotificationClick
         )
+
+        sensorSection()
 
         if (uiState.isManualMode) {
             Surface(

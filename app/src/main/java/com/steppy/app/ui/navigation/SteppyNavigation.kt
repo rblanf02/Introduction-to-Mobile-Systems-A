@@ -16,7 +16,7 @@ import com.steppy.app.ui.components.SteppyBottomNavigationBar
 import com.steppy.app.ui.screens.*
 
 @Composable
-fun SteppyApp(viewModel: SteppyViewModel) {
+fun SteppyApp(viewModel: SteppyViewModel,sensorSection: @Composable () -> Unit = {}) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -65,7 +65,8 @@ fun SteppyApp(viewModel: SteppyViewModel) {
                         onAddSteps = viewModel::addSteps,
                         onNotificationClick = {
                             navController.navigate(BottomTab.PROFILE.route)
-                        }
+                        },
+                        sensorSection = sensorSection
                     )
                 }
                 composable(BottomTab.PROGRESS.route) {
