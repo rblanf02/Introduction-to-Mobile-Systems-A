@@ -17,6 +17,10 @@ import com.steppy.app.ui.LocalSteppyRepository
 import com.steppy.app.ui.SteppyViewModel
 import com.steppy.app.ui.navigation.SteppyApp
 import com.steppy.app.ui.theme.SteppyTheme
+import com.steppy.app.platform.debug.SimulatedStepCounter
+import com.steppy.app.platform.debug.DebugFlags
+import com.steppy.app.platform.sensor.StepCounterSource
+
 
 class MainActivity : ComponentActivity() {
 
@@ -29,11 +33,18 @@ class MainActivity : ComponentActivity() {
 
         val repository = LocalSteppyRepository(applicationContext)
 
+        // Role C: step counter. The real sensor, or a SIMULATED one for demos on devices without it
+        val realSensor = StepSensorDataSource(applicationContext)
+        val useSimulation: Boolean =
+            DebugFlags.SIMULATE_STEP_SENSOR_WHEN_MISSING && !realSensor.isAvailable()
+        val simulatedCounter: SimulatedStepCounter? = if (useSimulation) SimulatedStepCounter() else null
+        val counterSource: StepCounterSource = if (simulatedCounter != null) simulatedCounter else realSensor
+
         // Role C: step sensor objects (manual dependency injection)
         val platformPreferences = PlatformPreferences(applicationContext)
         val stepRepository: StepRepository = SensorStepRepository(
             activity = this,
-            sensor = StepSensorDataSource(applicationContext),
+            sensor = counterSource,
             preferences = platformPreferences
         )
 
@@ -49,7 +60,8 @@ class MainActivity : ComponentActivity() {
                             stepRepository = stepRepository,
                             preferences = platformPreferences,
                             refreshKey = sensorRefreshKey,
-                            onSensorSteps = steppyViewModel::onSensorStepsUpdated
+                            onSensorSteps = steppyViewModel::onSensorStepsUpdated,
+                            simulatedCounter = simulatedCounter
                         )
                     }
                 )

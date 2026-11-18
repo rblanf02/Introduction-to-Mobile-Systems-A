@@ -24,10 +24,11 @@ import com.steppy.app.data.repository.StepRepository
 import com.steppy.app.platform.PlatformPreferences
 import com.steppy.app.platform.permission.ActivityRecognitionPermission
 import com.steppy.app.platform.sensor.StepTrackingState
+import com.steppy.app.platform.debug.SimulatedStepCounter
 
 
 @Composable
-fun StepTrackingSection (stepRepository: StepRepository, preferences: PlatformPreferences, refreshKey: Int, onSensorSteps: (Int) -> Unit) {
+fun StepTrackingSection (stepRepository: StepRepository, preferences: PlatformPreferences, refreshKey: Int, onSensorSteps: (Int) -> Unit, simulatedCounter: SimulatedStepCounter? = null) {
 
     val context = LocalContext.current
 
@@ -92,6 +93,19 @@ fun StepTrackingSection (stepRepository: StepRepository, preferences: PlatformPr
             StepTrackingCard(
                 text = "Manual mode: ${currentState.todaySteps} steps logged by hand today."
             )
+        }
+        is StepTrackingState.Tracking -> {
+            if (simulatedCounter != null) {
+                StepTrackingCard(
+                    text = "SIMULATED step sensor (demo only, not real data): ${currentState.todaySteps} simulated steps today.",
+                    buttonText = "+500 steps (SIMULATED)",
+                    onButtonClick = { simulatedCounter.addSteps(500) }
+                )
+            } else {
+                StepTrackingCard(
+                    text = "Step sensor active: ${currentState.todaySteps} steps counted by the phone today."
+                )
+            }
         }
     }
 }

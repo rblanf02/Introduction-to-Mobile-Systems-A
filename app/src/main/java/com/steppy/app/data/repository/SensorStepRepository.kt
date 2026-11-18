@@ -5,6 +5,7 @@ import com.steppy.app.platform.PlatformPreferences
 import com.steppy.app.platform.permission.ActivityRecognitionPermission
 import com.steppy.app.platform.sensor.DailyStepCalculator
 import com.steppy.app.platform.sensor.DailyStepRecord
+import com.steppy.app.platform.sensor.StepCounterSource
 import com.steppy.app.platform.sensor.StepSensorDataSource
 import com.steppy.app.platform.sensor.StepTrackingState
 import kotlinx.coroutines.flow.Flow
@@ -13,7 +14,7 @@ import java.time.LocalDate
 
 class SensorStepRepository (
     private val activity: Activity,
-    private val sensor: StepSensorDataSource,
+    private val sensor: StepCounterSource,
     private val preferences: PlatformPreferences
 ) : StepRepository {
     override  val state: Flow<StepTrackingState> = flow {

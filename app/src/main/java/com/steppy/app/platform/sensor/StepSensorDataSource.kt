@@ -16,15 +16,15 @@ import kotlinx.coroutines.flow.emptyFlow
  * The sensor returns the total steps since the phone was last rebooted.
  */
 
-class StepSensorDataSource(context: Context) {
+class StepSensorDataSource(context: Context) : StepCounterSource{
 
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
     private val stepCounter: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
 
-    fun isAvailable(): Boolean = stepCounter != null
+    override fun isAvailable(): Boolean = stepCounter != null
 
-    fun stepSinceReboot(): Flow<Int> {
+    override fun stepSinceReboot(): Flow<Int> {
 
         val sensor = stepCounter ?: return  emptyFlow()
 
