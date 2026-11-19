@@ -28,7 +28,11 @@ import com.steppy.app.platform.debug.SimulatedStepCounter
 
 
 @Composable
-fun StepTrackingSection (stepRepository: StepRepository, preferences: PlatformPreferences, refreshKey: Int, onSensorSteps: (Int) -> Unit, simulatedCounter: SimulatedStepCounter? = null) {
+fun StepTrackingSection (stepRepository: StepRepository, preferences: PlatformPreferences,
+                         refreshKey: Int,
+                         onSensorSteps: (Int) -> Unit, simulatedCounter: SimulatedStepCounter? = null,
+                         onTrackingChanged: (Boolean) -> Unit = {})
+{
 
     val context = LocalContext.current
 
@@ -47,7 +51,10 @@ fun StepTrackingSection (stepRepository: StepRepository, preferences: PlatformPr
         stepRepository.state.collect { newState ->
             trackingState = newState
             if (newState is StepTrackingState.Tracking) {
+                onTrackingChanged(true)
                 onSensorSteps(newState.todaySteps)
+            } else {
+                onTrackingChanged(false)
             }
         }
     }
@@ -62,9 +69,17 @@ fun StepTrackingSection (stepRepository: StepRepository, preferences: PlatformPr
         }
 
         is StepTrackingState.Tracking -> {
-            StepTrackingCard(
-                text = "Step sensor active: ${currentState.todaySteps} steps counted by the phone today."
-            )
+            if (simulatedCounter != null) {
+                StepTrackingCard(
+                    text = "SIMULATED step sensor (demo only, not real data): ${currentState.todaySteps} simulated steps today.",
+                    buttonText = "+500 steps (SIMULATED)",
+                    onButtonClick = { simulatedCounter.addSteps(500) }
+                )
+            } else {
+                StepTrackingCard(
+                    text = "Step sensor active: ${currentState.todaySteps} steps counted by the phone today."
+                )
+            }
         }
 
         StepTrackingState.Unavailable -> {
@@ -88,27 +103,10 @@ fun StepTrackingSection (stepRepository: StepRepository, preferences: PlatformPr
                 )
             }
         }
-
-        is StepTrackingState.Manual -> {
-            StepTrackingCard(
-                text = "Manual mode: ${currentState.todaySteps} steps logged by hand today."
-            )
-        }
-        is StepTrackingState.Tracking -> {
-            if (simulatedCounter != null) {
-                StepTrackingCard(
-                    text = "SIMULATED step sensor (demo only, not real data): ${currentState.todaySteps} simulated steps today.",
-                    buttonText = "+500 steps (SIMULATED)",
-                    onButtonClick = { simulatedCounter.addSteps(500) }
-                )
-            } else {
-                StepTrackingCard(
-                    text = "Step sensor active: ${currentState.todaySteps} steps counted by the phone today."
-                )
-            }
-        }
     }
+
 }
+
     @Composable
     private fun StepTrackingCard(
         text: String,

@@ -21,8 +21,6 @@ sealed interface StepTrackingState{
     /** The sensor is working. [todaySteps] are the steps counted since midnight. */
     data class Tracking (val todaySteps:Int) : StepTrackingState
 
-    /** Fallback: steps entered by hand by the user. */
-    data class Manual (val todaySteps:Int) :StepTrackingState
 }
 
 
