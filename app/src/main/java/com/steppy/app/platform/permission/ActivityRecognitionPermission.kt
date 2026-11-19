@@ -15,11 +15,10 @@ object ActivityRecognitionPermission {
     const val PERMISSION : String = Manifest.permission.ACTIVITY_RECOGNITION
 
 
-    //**
-    //
-    // Return True if the app is allowed to read StepCounter
-    //  Before Android 10, the permission did not exist so return true by default
-    // */
+    /**
+     * Returns true if the app is allowed to read the step counter.
+     * Before Android 10 (API 29) this permission did not exist, so it returns true.
+     */
 
     fun isGrated (context: Context) : Boolean {
         if(Build.VERSION.SDK_INT < Build.VERSION_CODES.Q){

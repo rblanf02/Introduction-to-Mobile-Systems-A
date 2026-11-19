@@ -5,8 +5,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  *
- * Public Interface StepRepository:
- *  state:describe current state, emit new value every time the permision or steps changes
+ *  state: describe current state, emit new value every time the permision or steps changes
  *
  */
 

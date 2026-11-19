@@ -24,10 +24,8 @@ import com.steppy.app.ui.theme.SteppyTheme
 
 class MainActivity : ComponentActivity() {
 
-    // Role C: changes every time the app comes back to the screen, so the sensor state is checked again
     private var sensorRefreshKey: Int by mutableIntStateOf(0)
 
-    // Role C: true while the step sensor (real or SIMULATED) is counting. Then manual entry is hidden
     private var sensorIsTracking: Boolean by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,14 +34,12 @@ class MainActivity : ComponentActivity() {
 
         val repository = LocalSteppyRepository(applicationContext)
 
-        // Role C: step counter. The real sensor, or a SIMULATED one for demos on devices without it
         val realSensor = StepSensorDataSource(applicationContext)
         val useSimulation: Boolean =
             DebugFlags.SIMULATE_STEP_SENSOR_WHEN_MISSING && !realSensor.isAvailable()
         val simulatedCounter: SimulatedStepCounter? = if (useSimulation) SimulatedStepCounter() else null
         val counterSource: StepCounterSource = if (simulatedCounter != null) simulatedCounter else realSensor
 
-        // Role C: step sensor objects (manual dependency injection)
         val platformPreferences = PlatformPreferences(applicationContext)
         val stepRepository: StepRepository = SensorStepRepository(
             activity = this,
