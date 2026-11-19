@@ -34,7 +34,8 @@ fun TodayScreen(
     uiState: SteppyUiState,
     onAddSteps: (Int) -> Unit,
     onNotificationClick: () -> Unit,
-    sensorSection: @Composable () -> Unit = {}
+    sensorSection: @Composable () -> Unit = {},
+    showManualEntry: Boolean = true
 ) {
     val context = LocalContext.current
     var showManualDialog by remember { mutableStateOf(false) }
@@ -64,7 +65,7 @@ fun TodayScreen(
 
         sensorSection()
 
-        if (uiState.isManualMode) {
+        if (uiState.isManualMode && showManualEntry) {
             Surface(
                 color = SteppyOrangeLight,
                 shape = RoundedCornerShape(12.dp),
@@ -345,17 +346,21 @@ fun TodayScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OutlinedButton(
-                onClick = { showManualDialog = true },
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .defaultMinSize(minHeight = 50.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Log steps", fontWeight = FontWeight.Bold)
+            if (showManualEntry){
+                OutlinedButton(
+                    onClick = { showManualDialog = true },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .defaultMinSize(minHeight = 50.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Log steps", fontWeight = FontWeight.Bold)
+                }
+
             }
+
 
             Button(
                 onClick = {

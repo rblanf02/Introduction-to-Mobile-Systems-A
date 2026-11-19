@@ -6,26 +6,29 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.steppy.app.data.repository.SensorStepRepository
 import com.steppy.app.data.repository.StepRepository
 import com.steppy.app.platform.PlatformPreferences
+import com.steppy.app.platform.debug.DebugFlags
+import com.steppy.app.platform.debug.SimulatedStepCounter
+import com.steppy.app.platform.sensor.StepCounterSource
 import com.steppy.app.platform.sensor.StepSensorDataSource
 import com.steppy.app.platform.ui.StepTrackingSection
 import com.steppy.app.ui.LocalSteppyRepository
 import com.steppy.app.ui.SteppyViewModel
 import com.steppy.app.ui.navigation.SteppyApp
 import com.steppy.app.ui.theme.SteppyTheme
-import com.steppy.app.platform.debug.SimulatedStepCounter
-import com.steppy.app.platform.debug.DebugFlags
-import com.steppy.app.platform.sensor.StepCounterSource
-
 
 class MainActivity : ComponentActivity() {
 
     // Role C: changes every time the app comes back to the screen, so the sensor state is checked again
     private var sensorRefreshKey: Int by mutableIntStateOf(0)
+
+    // Role C: true while the step sensor (real or SIMULATED) is counting. Then manual entry is hidden
+    private var sensorIsTracking: Boolean by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,13 +58,15 @@ class MainActivity : ComponentActivity() {
                 )
                 SteppyApp(
                     viewModel = steppyViewModel,
+                    showManualEntry = !sensorIsTracking,
                     sensorSection = {
                         StepTrackingSection(
                             stepRepository = stepRepository,
                             preferences = platformPreferences,
                             refreshKey = sensorRefreshKey,
                             onSensorSteps = steppyViewModel::onSensorStepsUpdated,
-                            simulatedCounter = simulatedCounter
+                            simulatedCounter = simulatedCounter,
+                            onTrackingChanged = { tracking -> sensorIsTracking = tracking }
                         )
                     }
                 )
