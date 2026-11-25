@@ -2,7 +2,7 @@ package com.steppy.app.platform
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.steppy.app.platform.sensor.DailyStepRecord
+import com.steppy.app.domain.DailyStepRecord
 import java.time.LocalDate
 
 /**

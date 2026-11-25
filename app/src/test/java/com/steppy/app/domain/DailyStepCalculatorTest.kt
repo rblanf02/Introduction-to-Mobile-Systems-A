@@ -1,4 +1,4 @@
-package com.steppy.app.platform.sensor
+package com.steppy.app.domain
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate

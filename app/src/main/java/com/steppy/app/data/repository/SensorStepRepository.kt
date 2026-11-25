@@ -3,8 +3,8 @@ package com.steppy.app.data.repository
 import android.app.Activity
 import com.steppy.app.platform.PlatformPreferences
 import com.steppy.app.platform.permission.ActivityRecognitionPermission
-import com.steppy.app.platform.sensor.DailyStepCalculator
-import com.steppy.app.platform.sensor.DailyStepRecord
+import com.steppy.app.domain.DailyStepCalculator
+import com.steppy.app.domain.DailyStepRecord
 import com.steppy.app.platform.sensor.StepCounterSource
 import com.steppy.app.platform.sensor.StepSensorDataSource
 import com.steppy.app.platform.sensor.StepTrackingState

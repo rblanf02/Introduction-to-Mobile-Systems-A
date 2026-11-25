@@ -1,4 +1,4 @@
-package com.steppy.app.platform.sensor
+package com.steppy.app.domain
 
 import java.time.LocalDate
 
