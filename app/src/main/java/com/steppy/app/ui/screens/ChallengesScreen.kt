@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.steppy.app.domain.ChallengeEvaluator
+import com.steppy.app.domain.Suggestions
 import com.steppy.app.ui.ChallengeUiItem
 import com.steppy.app.ui.SteppyUiState
 import com.steppy.app.ui.components.SteppyTopHeader
@@ -34,7 +35,10 @@ fun ChallengesScreen(
     onNotificationClick: () -> Unit
 ) {
     val activeChallenges = uiState.challenges.filter { it.isActive }
-    val availableChallenges = uiState.challenges.filter { !it.isActive }
+    val availableChallenges = Suggestions.orderChallenges(
+        uiState.challenges.filter { !it.isActive },
+        uiState.motivation
+    ) { it.id }
 
     Column(
         modifier = Modifier

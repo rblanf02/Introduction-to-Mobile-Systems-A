@@ -1,7 +1,9 @@
 package com.steppy.app.ui
 
+import com.steppy.app.domain.ActivityLevel
 import com.steppy.app.domain.ChallengeState
 import com.steppy.app.domain.LevelProgress
+import com.steppy.app.domain.MainMotivation
 import com.steppy.app.domain.XpCalculator
 
 enum class Mascot(val displayName: String, val emoji: String) {
@@ -9,18 +11,6 @@ enum class Mascot(val displayName: String, val emoji: String) {
     PUPPY("Puppy", "🐶"),
     OSTRICH("Ostrich", "🦤"),
     IGUANA("Iguana", "🦎")
-}
-
-enum class MainMotivation(val label: String) {
-    MOVE_MORE("Move more"),
-    BUILD_STREAK("Build a streak"),
-    STAY_HEALTHY("Stay healthy")
-}
-
-enum class ActivityLevel(val label: String) {
-    JUST_STARTING("Just starting"),
-    SOMEWHAT_ACTIVE("Somewhat active"),
-    VERY_ACTIVE("Very active")
 }
 
 data class ChallengeUiItem(

@@ -1,6 +1,8 @@
 package com.steppy.app.data.repository
 
 import android.content.Context
+import com.steppy.app.domain.ActivityLevel
+import com.steppy.app.domain.MainMotivation
 import com.steppy.app.ui.Mascot
 import com.steppy.app.ui.SteppyUiState
 import com.steppy.app.ui.defaultChallenges
@@ -27,6 +29,12 @@ class LocalSteppyRepository(context: Context) : SteppyRepository {
         val username = prefs.getString("username", "Aitor") ?: "Aitor"
         val mascotName = prefs.getString("mascot", Mascot.SLOTH.name) ?: Mascot.SLOTH.name
         val mascot = runCatching { Mascot.valueOf(mascotName) }.getOrDefault(Mascot.SLOTH)
+        val motivation = runCatching {
+            MainMotivation.valueOf(prefs.getString("main_goal", null) ?: "")
+        }.getOrDefault(MainMotivation.MOVE_MORE)
+        val activityLevel = runCatching {
+            ActivityLevel.valueOf(prefs.getString("activity_level", null) ?: "")
+        }.getOrDefault(ActivityLevel.SOMEWHAT_ACTIVE)
         val goal = prefs.getInt("daily_goal", 10000)
         val steps = prefs.getInt("today_steps", 0)
         val streak = prefs.getInt("streak", 0)
@@ -49,6 +57,8 @@ class LocalSteppyRepository(context: Context) : SteppyRepository {
             isOnboardingCompleted = onboarded,
             username = username,
             selectedMascot = mascot,
+            motivation = motivation,
+            activityLevel = activityLevel,
             dailyGoal = goal,
             todaySteps = steps,
             currentStreak = streak,
@@ -68,6 +78,8 @@ class LocalSteppyRepository(context: Context) : SteppyRepository {
             .putBoolean("onboarded", state.isOnboardingCompleted)
             .putString("username", state.username)
             .putString("mascot", state.selectedMascot.name)
+            .putString("main_goal", state.motivation.name)
+            .putString("activity_level", state.activityLevel.name)
             .putInt("daily_goal", state.dailyGoal)
             .putInt("today_steps", state.todaySteps)
             .putInt("streak", state.currentStreak)

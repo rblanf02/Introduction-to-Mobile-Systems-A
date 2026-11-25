@@ -26,6 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.steppy.app.domain.ActivityLevel
+import com.steppy.app.domain.MainMotivation
+import com.steppy.app.domain.Suggestions
 import com.steppy.app.ui.*
 import com.steppy.app.ui.theme.*
 
@@ -65,7 +68,6 @@ fun OnboardingFlowScreen(
                 initialName = uiState.username,
                 initialMotivation = uiState.motivation,
                 initialActivity = uiState.activityLevel,
-                initialGoal = uiState.dailyGoal,
                 onContinue = { name, mot, act, goal ->
                     onSaveSetup(name, mot, act, goal)
                     step = 2
@@ -133,13 +135,15 @@ private fun ProfileSetupStep(
     initialName: String,
     initialMotivation: MainMotivation,
     initialActivity: ActivityLevel,
-    initialGoal: Int,
     onContinue: (String, MainMotivation, ActivityLevel, Int) -> Unit
 ) {
     var username by remember { mutableStateOf(initialName) }
     var motivation by remember { mutableStateOf(initialMotivation) }
     var activity by remember { mutableStateOf(initialActivity) }
-    var selectedGoal by remember { mutableIntStateOf(initialGoal) }
+    // The suggested preset is preselected and follows the activity level until the user picks a goal
+    var selectedGoal by remember { mutableIntStateOf(Suggestions.suggestedGoal(initialActivity)) }
+    var goalPickedByUser by remember { mutableStateOf(false) }
+    val suggestedGoal = Suggestions.suggestedGoal(activity)
 
     val goalOptions = listOf(
         3000 to "Relax (3,000 steps)",
@@ -195,7 +199,10 @@ private fun ProfileSetupStep(
                 SelectableOptionPill(
                     label = level.label,
                     selected = activity == level,
-                    onClick = { activity = level }
+                    onClick = {
+                        activity = level
+                        if (!goalPickedByUser) selectedGoal = Suggestions.suggestedGoal(level)
+                    }
                 )
             }
         }
@@ -213,7 +220,10 @@ private fun ProfileSetupStep(
                             .fillMaxWidth()
                             .defaultMinSize(minHeight = 52.dp)
                             .background(if (isSelected) SteppyMintLight else SteppyCardWhite)
-                            .clickable(role = Role.RadioButton) { selectedGoal = steps }
+                            .clickable(role = Role.RadioButton) {
+                                selectedGoal = steps
+                                goalPickedByUser = true
+                            }
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -223,12 +233,22 @@ private fun ProfileSetupStep(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) SteppyTealDark else SteppyDarkNavy
                         )
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Selected goal",
-                                tint = SteppyTealDark
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (steps == suggestedGoal) {
+                                Text(
+                                    text = "Suggested",
+                                    fontSize = 13.sp,
+                                    color = SteppyTextGray
+                                )
+                            }
+                            if (isSelected) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Selected goal",
+                                    tint = SteppyTealDark
+                                )
+                            }
                         }
                     }
                     if (index < goalOptions.lastIndex) {

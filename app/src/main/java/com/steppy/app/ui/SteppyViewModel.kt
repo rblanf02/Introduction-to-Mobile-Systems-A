@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.steppy.app.data.repository.SteppyRepository
 import com.steppy.app.domain.ActivationResult
+import com.steppy.app.domain.ActivityLevel
 import com.steppy.app.domain.ChallengeEvaluation
 import com.steppy.app.domain.ChallengeEvaluator
+import com.steppy.app.domain.MainMotivation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
