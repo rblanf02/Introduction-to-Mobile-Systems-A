@@ -1,0 +1,131 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "f634a0a9b23d7eb2a8976db568240c36",
+    "entities": [
+      {
+        "tableName": "daily_records",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`date` TEXT NOT NULL, `steps` INTEGER NOT NULL, `stepsBeforeNoon` INTEGER, `goal` INTEGER NOT NULL, `source` TEXT NOT NULL, PRIMARY KEY(`date`))",
+        "fields": [
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "steps",
+            "columnName": "steps",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stepsBeforeNoon",
+            "columnName": "stepsBeforeNoon",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "goal",
+            "columnName": "goal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "date"
+          ]
+        }
+      },
+      {
+        "tableName": "user_challenges",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`challengeId` TEXT NOT NULL, `activatedOn` TEXT NOT NULL, `completedOn` TEXT, PRIMARY KEY(`challengeId`))",
+        "fields": [
+          {
+            "fieldPath": "challengeId",
+            "columnName": "challengeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activatedOn",
+            "columnName": "activatedOn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedOn",
+            "columnName": "completedOn",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "challengeId"
+          ]
+        }
+      },
+      {
+        "tableName": "progress_baseline",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `asOf` TEXT NOT NULL, `xpBefore` INTEGER NOT NULL, `streakBefore` INTEGER NOT NULL, `heartsBefore` INTEGER NOT NULL, `activeDaysBefore` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "asOf",
+            "columnName": "asOf",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "xpBefore",
+            "columnName": "xpBefore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "streakBefore",
+            "columnName": "streakBefore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "heartsBefore",
+            "columnName": "heartsBefore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activeDaysBefore",
+            "columnName": "activeDaysBefore",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f634a0a9b23d7eb2a8976db568240c36')"
+    ]
+  }
+}
