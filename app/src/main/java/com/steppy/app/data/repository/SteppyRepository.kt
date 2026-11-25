@@ -34,9 +34,15 @@ class LocalSteppyRepository(context: Context) : SteppyRepository {
         val manual = prefs.getBoolean("manual_mode", false)
         val reminders = prefs.getBoolean("reminders", true)
         val activeIds = prefs.getStringSet("active_challenges", emptySet()) ?: setOf("c1", "c2")
+        val completedIds = prefs.getStringSet("completed_challenges", emptySet()) ?: emptySet()
 
         val challenges = defaultChallenges(steps, streak, steps).map { item ->
-            item.copy(isActive = activeIds.contains(item.id))
+            val completed = completedIds.contains(item.id)
+            item.copy(
+                isActive = activeIds.contains(item.id),
+                isCompleted = completed,
+                currentProgress = if (completed) item.targetProgress else item.currentProgress
+            )
         }
 
         return SteppyUiState(
@@ -57,6 +63,7 @@ class LocalSteppyRepository(context: Context) : SteppyRepository {
 
     override fun saveState(state: SteppyUiState) {
         val activeIds = state.challenges.filter { it.isActive }.map { it.id }.toSet()
+        val completedIds = state.challenges.filter { it.isCompleted }.map { it.id }.toSet()
         prefs.edit()
             .putBoolean("onboarded", state.isOnboardingCompleted)
             .putString("username", state.username)
@@ -68,6 +75,7 @@ class LocalSteppyRepository(context: Context) : SteppyRepository {
             .putBoolean("manual_mode", state.isManualMode)
             .putBoolean("reminders", state.remindersEnabled)
             .putStringSet("active_challenges", activeIds)
+            .putStringSet("completed_challenges", completedIds)
             .apply()
     }
 

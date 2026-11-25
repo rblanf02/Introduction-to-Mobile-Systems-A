@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.steppy.app.domain.ChallengeEvaluator
 import com.steppy.app.ui.ChallengeUiItem
 import com.steppy.app.ui.SteppyUiState
 import com.steppy.app.ui.components.SteppyTopHeader
@@ -51,7 +52,7 @@ fun ChallengesScreen(
         )
 
         Text(
-            text = "Active challenges (${activeChallenges.size}/3)",
+            text = "Active challenges (${activeChallenges.count { !it.isCompleted }}/${ChallengeEvaluator.MAX_ACTIVE})",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = SteppyDarkNavy

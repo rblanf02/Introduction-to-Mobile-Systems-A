@@ -1,5 +1,6 @@
 package com.steppy.app.ui
 
+import com.steppy.app.domain.ChallengeState
 import com.steppy.app.domain.LevelProgress
 import com.steppy.app.domain.XpCalculator
 
@@ -37,6 +38,28 @@ data class ChallengeUiItem(
         get() = if (targetProgress > 0) {
             (currentProgress.toFloat() / targetProgress).coerceIn(0f, 1f)
         } else 0f
+}
+
+fun ChallengeUiItem.toChallengeState(): ChallengeState = ChallengeState(
+    id = id,
+    target = targetProgress,
+    xpReward = xpReward,
+    progress = currentProgress,
+    isActive = isActive,
+    isCompleted = isCompleted
+)
+
+/** Copies progress, active and completed from [states] onto the matching UI items. */
+fun List<ChallengeUiItem>.withChallengeStates(states: List<ChallengeState>): List<ChallengeUiItem> {
+    val byId = states.associateBy { it.id }
+    return map { item ->
+        val state = byId[item.id] ?: return@map item
+        item.copy(
+            currentProgress = state.progress,
+            isActive = state.isActive,
+            isCompleted = state.isCompleted
+        )
+    }
 }
 
 data class DayBarUi(
@@ -121,8 +144,7 @@ fun defaultChallenges(todaySteps: Int, streak: Int, weeklySteps: Int): List<Chal
         currentProgress = todaySteps,
         targetProgress = 10000,
         unit = "steps",
-        isActive = false,
-        isCompleted = todaySteps >= 10000
+        isActive = false
     ),
     ChallengeUiItem(
         id = "c2",
@@ -132,8 +154,7 @@ fun defaultChallenges(todaySteps: Int, streak: Int, weeklySteps: Int): List<Chal
         currentProgress = streak,
         targetProgress = 7,
         unit = "days",
-        isActive = false,
-        isCompleted = streak >= 7
+        isActive = false
     ),
     ChallengeUiItem(
         id = "c3",
@@ -153,8 +174,7 @@ fun defaultChallenges(todaySteps: Int, streak: Int, weeklySteps: Int): List<Chal
         currentProgress = weeklySteps,
         targetProgress = 50000,
         unit = "steps",
-        isActive = false,
-        isCompleted = weeklySteps >= 50000
+        isActive = false
     ),
     ChallengeUiItem(
         id = "c5",
@@ -164,7 +184,6 @@ fun defaultChallenges(todaySteps: Int, streak: Int, weeklySteps: Int): List<Chal
         currentProgress = todaySteps.coerceAtMost(2000),
         targetProgress = 2000,
         unit = "steps",
-        isActive = false,
-        isCompleted = todaySteps >= 2000
+        isActive = false
     )
 )

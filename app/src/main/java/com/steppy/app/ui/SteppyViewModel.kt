@@ -3,6 +3,9 @@ package com.steppy.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.steppy.app.data.repository.SteppyRepository
+import com.steppy.app.domain.ActivationResult
+import com.steppy.app.domain.ChallengeEvaluation
+import com.steppy.app.domain.ChallengeEvaluator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -63,30 +66,31 @@ class SteppyViewModel(
             val newStreak = if (!wasGoalMet && isNowGoalMet) state.currentStreak + 1 else state.currentStreak
             val newWeeklyTotal = state.weeklyBars.filter { !it.isToday }.sumOf { it.steps } + newSteps
 
-            val updatedChallenges = state.challenges.map { ch ->
-                val newProgress = when (ch.id) {
-                    "c1" -> newSteps
-                    "c2" -> newStreak
-                    "c4" -> newWeeklyTotal
-                    "c5" -> newSteps.coerceAtMost(2000)
-                    else -> ch.currentProgress
-                }
-                val completedNow = newProgress >= ch.targetProgress
-                ch.copy(
-                    currentProgress = newProgress,
-                    isCompleted = ch.isCompleted || completedNow
-                )
-            }
+            val progressById = mapOf(
+                "c1" to newSteps,
+                "c2" to newStreak,
+                "c4" to newWeeklyTotal,
+                "c5" to newSteps.coerceAtMost(2000)
+            )
+            val evaluation = ChallengeEvaluator.evaluate(
+                state.challenges.map { it.toChallengeState() },
+                progressById
+            )
+
+            val goalMessage = if (!wasGoalMet && isNowGoalMet) {
+                "Daily goal reached! Streak +1 and +50 bonus XP!"
+            } else null
 
             state.copy(
                 todaySteps = newSteps,
                 currentStreak = newStreak,
                 totalHistoricalSteps = newWeeklyTotal,
+                baseXP = state.baseXP + evaluation.xpAwarded,
                 weeklyBars = defaultWeeklyBars(state.dailyGoal, newSteps),
-                challenges = updatedChallenges,
-                statusBannerMessage = if (!wasGoalMet && isNowGoalMet) {
-                    "Daily goal reached! Streak +1 and +50 bonus XP!"
-                } else null
+                challenges = state.challenges.withChallengeStates(evaluation.challenges),
+                statusBannerMessage = listOfNotNull(goalMessage, completionMessage(state, evaluation))
+                    .joinToString(" ")
+                    .ifEmpty { null }
             )
         }
     }
@@ -99,20 +103,31 @@ class SteppyViewModel(
 
     fun activateChallenge(challengeId: String) {
         updateAndPersist { state ->
-            val activeCount = state.challenges.count { it.isActive && !it.isCompleted }
-            if (activeCount >= 3) {
-                return@updateAndPersist state.copy(
-                    statusBannerMessage = "You can have a maximum of 3 active challenges at once."
+            val states = state.challenges.map { it.toChallengeState() }
+            when (val result = ChallengeEvaluator.activate(states, challengeId)) {
+                ActivationResult.LimitReached -> state.copy(
+                    statusBannerMessage = "You can have a maximum of ${ChallengeEvaluator.MAX_ACTIVE} active challenges at once."
                 )
+                ActivationResult.NotAvailable -> state
+                is ActivationResult.Activated -> {
+                    // The target may already be reached today, so it can complete right away
+                    val evaluation = ChallengeEvaluator.evaluate(result.challenges)
+                    state.copy(
+                        baseXP = state.baseXP + evaluation.xpAwarded,
+                        challenges = state.challenges.withChallengeStates(evaluation.challenges),
+                        statusBannerMessage = completionMessage(state, evaluation) ?: "Challenge activated!"
+                    )
+                }
             }
-            val updated = state.challenges.map {
-                if (it.id == challengeId) it.copy(isActive = true) else it
-            }
-            state.copy(
-                challenges = updated,
-                statusBannerMessage = "Challenge activated!"
-            )
         }
+    }
+
+    private fun completionMessage(state: SteppyUiState, evaluation: ChallengeEvaluation): String? {
+        if (evaluation.newlyCompleted.isEmpty()) return null
+        val titles = state.challenges
+            .filter { it.id in evaluation.newlyCompleted }
+            .joinToString(", ") { it.title }
+        return "Challenge completed: $titles! +${evaluation.xpAwarded} XP"
     }
 
     fun dismissBanner() {
