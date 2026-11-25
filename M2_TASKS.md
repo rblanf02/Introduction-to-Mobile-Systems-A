@@ -2,118 +2,124 @@
 
 M2 (Week 9) is a **working demo**: the main journey running on a real phone, data kept after restart, and the real step sensor. **Steppy runs completely locally** (no backend, no `INTERNET` permission). The demo **must show the denied-permission path and airplane mode**, where airplane mode shows that nothing changes (see [PROJECT_PLAN.md §9](PROJECT_PLAN.md)).
 
-This board covers Weeks 5–8 from the plan, plus demo preparation. Work from Week 10 onward (QR transfer, "Delete my data", the full test suite, usability sessions) is **not** needed for M2.
+This board covers Weeks 5–8 from the plan, plus demo preparation. Work from Week 10 onward (QR transfer, the full test suite, usability sessions) is **not** needed for M2.
 
 **Roles** (from [PROJECT_PLAN.md §10](PROJECT_PLAN.md), still to be assigned): **A** UI/UX & Accessibility · **B** Data & Logic · **C** Platform & Network
 
 **Priority:** **P0** is needed for the M2 demo · **P1** is planned for this period but can slip to Week 10 if needed
 
----
-
-## Current state (as of this board)
-
-- ⚠️ **There is no Android project yet.** `app.kt` is empty and the repo has no Gradle files. The Week 1 output ("Compose starter app runs") is not done, so it blocks everything else.
-- ⚠️ **The roles table is still "to assign".**
-- ⚠️ **The README's acceptance criteria are out of date:** US1 there says "500–50,000 steps", but the plan uses four presets. The README also links a different Canva prototype from the M1 submission.
-- `.idea/` and `M1_Submission.docx` are untracked. `.idea/` should go in `.gitignore`.
+**Status:** ✅ done · 🟡 partly done · ⬜ not started
 
 ---
 
-## Phase 0 — Foundation (do first, it blocks everything)
+## Status check (25 Nov 2026, `main` at `71c87b1`)
 
-| ID | Task | Role | Prio | Done when |
-|---|---|---|---|---|
-| F1 | Create the Android Studio project: Kotlin, Compose, Navigation, a version catalog with the dependencies from §5, and min SDK 29 (Android 10+, matching the physical test phone). Delete the empty `app.kt`. | C | P0 | The app builds and runs on both the emulator and the phone |
-| F2 | Add a `.gitignore` for Android (`.idea/`, `build/`, `local.properties`, `*.iml`) | C | P0 | `git status` is clean after a build |
-| F3 | Set up packages `ui/`, `domain/`, `data/`, `di/`, plus an `AppContainer` for manual dependency injection | B | P0 | Other tasks have a place to put their code |
-| F4 | Assign roles A/B/C in PROJECT_PLAN §10. Agree on a branch and PR workflow. | All | P0 | Names are in the table |
-| F5 | Create `AI_USE.md` with its first entry (a Week 5 requirement) | All | P0 | The file exists and has an entry |
-| F6 | Update the README: user stories in line with the plan (presets), one Canva link, build instructions | B | P1 | The README matches PROJECT_PLAN |
+**What has been done** (Aitor and Rubén, 17–19 Nov):
+- The Android project builds (Compose, Navigation, min SDK 26), and its `.gitignore` covers `.idea/`.
+- All screens exist: onboarding, Today, Progress, Challenges, Profile. They share a single `SteppyViewModel`, and the data is saved in SharedPreferences.
+- Step sensor (`StepSensorDataSource`, `SensorStepRepository`), the `ACTIVITY_RECOGNITION` permission with a manual-logging fallback, and a simulated counter for the emulator.
+- `DailyStepCalculator` with 4 unit tests. `testDebugUnitTest` passes.
+
+**Biggest gaps for M2:**
+1. **Game rules are not separate or tested (D1–D3).** Streak, XP and challenge logic are inside `SteppyUiState` and `SteppyViewModel`. Hearts are fixed at 1. `baseXP` never grows, so XP from previous days and from challenges is lost.
+2. **No daily history (L1, L4).** Only `today_steps` and `streak` are stored. The weekly chart, active days and "streak lost" have no data behind them.
+3. **Day rollover bug (P2).** At midnight the sensor resets to 0, but `onSensorStepsUpdated` ignores decreases, so Today keeps showing yesterday's steps.
+4. **No reminder notification (P5)** and no Reminder onboarding screen.
+5. **The rest of the plan uses Room and DataStore, but the code uses SharedPreferences.** Decide whether to migrate or update the plan (see the open decisions).
 
 ---
 
-## Phase 1 — Week 5: User journey with fake data
+## Phase 0 — Foundation
 
-**Goal:** Setup → Today → Challenges works end to end with in-memory steps.
+| ID | Task | Role | Prio | Status | Notes |
+|---|---|---|---|---|---|
+| F1 | Android Studio project (Kotlin, Compose, Navigation, version catalog) | C | P0 | ✅ | min SDK 26, target SDK 37 |
+| F2 | Android `.gitignore` | C | P0 | ✅ | |
+| F3 | Package structure and manual dependency injection | B | P0 | 🟡 | Has `ui/`, `data/` and `platform/`. There's no `domain/` package for the pure logic, and dependencies are wired in `MainActivity` |
+| F4 | Assign roles A/B/C in PROJECT_PLAN §10. Agree on a branch and PR workflow. | All | P0 | ⬜ | |
+| F5 | Create `AI_USE.md` with its first entry | All | P0 | ⬜ | The file doesn't exist yet |
+| F6 | Update the README: user stories in line with the plan, one Canva link, build instructions | B | P1 | ⬜ | |
+
+---
+
+## Phase 1 — Week 5: User journey
 
 ### UI (A)
-| ID | Task | Prio | Done when |
-|---|---|---|---|
-| U1 | Theme and shared components: a minimum touch size of 48 dp (AR1), a single number format such as `7,842` | P0 | Shared components are used on every screen |
-| U2 | Navigation graph: an onboarding flow, then the main app with a bottom bar. The bar **highlights the current tab** (a prototype fix). | P0 | Back stack is correct; onboarding is skipped once it has been completed |
-| U3 | Onboarding screens: Welcome, Setup (nickname, main goal, activity level, presets), Choose mascot, Step permission (Allow / **Not now**), Reminder (Allow / Not now) | P0 | "Continue" stays disabled until a goal is picked; the suggested preset follows the activity level (US1) |
-| U4 | Today screen: steps vs. goal, streak, hearts, weekly active days, XP and level. Uses merged semantics (AR2). | P0 | TalkBack reads "Today's steps: 7,842 of 10,000, 78 percent" |
-| U5 | Challenges screen: Active (with progress bars) and Available (with "Activate") | P0 | Shows current / target, as in US3 |
-| U6 | Feedback states: Goal reached, Streak lost, Empty state (Today and Progress) | P0 | All three can be triggered from fake data |
-| U7 | Progress screen: level and XP, active days, a weekly chart where goal met/missed has an icon or label as well as colour (AR3) | P1 | The 3- and 6-month views can wait |
-| U8 | Profile stub: mascot, goal, reminder time, permissions. Leave placeholders for transfer, backup and delete. | P1 | Changing the goal works (US1) |
+| ID | Task | Prio | Status | Notes |
+|---|---|---|---|---|
+| U1 | 48 dp touch targets (AR1), one number format | P0 | 🟡 | 48 dp is only on Profile; Today uses a number formatter |
+| U2 | Navigation: onboarding, then a bottom bar that highlights the current tab | P0 | ✅ | |
+| U3 | Onboarding: Welcome, Setup (presets), Mascot, Step permission (Allow / Not now), Reminder | P0 | 🟡 | **The Reminder screen is missing.** The presets are 3,000 / 6,000 / 10,000 / 15,000. Check that "Continue" is disabled until a goal is picked and that the preset follows the activity level |
+| U4 | Today: steps vs. goal, streak, hearts, active days, XP and level, with merged semantics (AR2) | P0 | 🟡 | The date is hard-coded ("Tuesday, May 21"). Hearts and weekly active days never change. Today has no merged semantics. The "Share streak" button is out of scope, so remove it. "Next reward…" is still shown |
+| U5 | Challenges: Active with progress bars, and Available | P0 | 🟡 | Works. "Weekend Walker" still says "3 walks", so reword it to 15,000 steps |
+| U6 | Feedback states: Goal reached, Streak lost, Empty state | P0 | 🟡 | "Goal reached" is only a snackbar. There are no Streak lost or Empty state screens |
+| U7 | Progress screen with an AR3-friendly chart | P1 | 🟡 | The screen and its semantics exist. The chart uses placeholder bars, with Spanish day letters ("L M X J…") |
+| U8 | Profile: mascot, goal, reminders, permissions, delete my data | P1 | 🟡 | Most of it is done. "Log out" is the wrong wording, because there are no accounts. The reminder time is missing |
 
-### Domain logic (B), pure Kotlin with unit tests started now
-| ID | Task | Prio | Done when |
-|---|---|---|---|
-| D1 | `StreakCalculator`: streak and hearts from `ProgressBaseline` + `DailyRecord`s (1 heart per 7-day streak, at most 2) | P0 | Tests cover a missed day with 2, 1 and 0 hearts |
-| D2 | `XpCalculator`: `steps/100` + 50 bonus, plus challenge XP and the level. **Choose the level formula first** (see the open decisions). | P0 | Tested |
-| D3 | `ChallengeEvaluator`: at most 3 active, XP awarded once, failing never touches the streak, plus the "Weekend Walker" and "Morning Mover" rules | P0 | Tested, including "completed on the day it was activated" and "4th activation rejected" |
-| D4 | Suggested-preset mapping and challenge ordering by main goal | P1 | Tested |
+### Domain logic (B), pure Kotlin with unit tests
+| ID | Task | Prio | Status | Notes |
+|---|---|---|---|---|
+| D1 | `StreakCalculator`: streak and hearts (1 heart per 7-day streak, at most 2) | P0 | ⬜ | The streak only goes up when today's goal is met. Missed days and hearts aren't handled |
+| D2 | `XpCalculator`: `steps/100` + 50 bonus, challenge XP, and the level | P0 | 🟡 | The formula is in `SteppyUiState`: level = `floor(sqrt(xp/50)) + 1`. Move it out and test it. XP from past days and from challenges is never added to `baseXP` |
+| D3 | `ChallengeEvaluator`: at most 3 active, XP awarded once, failing never touches the streak | P0 | 🟡 | The 3-active limit works in the ViewModel. No XP is awarded, and there are no tests |
+| D4 | Suggested preset and challenge ordering by main goal | P1 | ⬜ | |
 
-### State (B + A)
-| ID | Task | Prio | Done when |
-|---|---|---|---|
-| S1 | A `StepRepository` interface with a `FakeStepRepository` and a **debug-only "+500 steps"** button | P0 | Steps on Today update live |
-| S2 | `OnboardingViewModel`, `TodayViewModel` (`StateFlow<TodayUiState>`), `ChallengesViewModel`, `ProgressViewModel` | P0 | Screens keep their state through rotation |
+### State
+| ID | Task | Prio | Status | Notes |
+|---|---|---|---|---|
+| S1 | `StepRepository` plus a simulated "+500 steps" | P0 | ✅ | `SimulatedStepCounter` replaced `FakeStepRepository` |
+| S2 | ViewModel(s) with `StateFlow` | P0 | ✅ | One shared `SteppyViewModel` rather than one per screen. That's fine for M2 |
 
 ---
 
 ## Phase 2 — Week 6: Local storage
 
-| ID | Task | Role | Prio | Done when |
-|---|---|---|---|---|
-| L1 | Room: entities `DailyRecord`, `UserChallenge` and `ProgressBaseline`, type converters for `LocalDate` and `StepSource`, and DAOs | B | P0 | DAO tests pass |
-| L2 | **Built-in challenge catalogue:** a bundled Kotlin list of `ChallengeDefinition` (`id`, `title`, `type`, `target`, `xp`), using the reworded "Weekend Walker". `UserChallenge.challengeId` refers to it. | B | P0 | All 5 challenges from §5 show on Challenges |
-| L3 | DataStore `SettingsRepository`: nickname, main goal, activity level, daily goal, mascot, reminder time, onboarding done | B | P0 | Values survive killing the app |
-| L4 | Write today's `goal` into each `DailyRecord`, so changing the goal does not rewrite history | B | P0 | Changing the goal mid-day is covered by a test |
-| L5 | Switch the ViewModels from fake data to the repositories | A+B | P0 | **Data survives a restart and rotation** |
-| L6 | JSON backup and restore: `BackupRepository`, kotlinx.serialization, the file picker (SAF), validation (version, checksum, value ranges), a "This will replace…" confirmation | B | P1 | Round trip restores the same streak and XP; an invalid file leaves data unchanged |
+| ID | Task | Role | Prio | Status | Notes |
+|---|---|---|---|---|---|
+| L1 | Room: `DailyRecord`, `UserChallenge`, `ProgressBaseline` and DAOs | B | P0 | ⬜ | **Needed for history, streak, hearts and the chart.** Room isn't a dependency yet |
+| L2 | Built-in challenge catalogue as a separate list | B | P0 | 🟡 | The challenges are hard-coded in `defaultChallenges()`. That works, but challenge progress is mixed into the definitions |
+| L3 | Settings storage (DataStore, or keep SharedPreferences) | B | P0 | 🟡 | `LocalSteppyRepository` saves most fields, but **not the main goal or activity level**. Those are lost after a restart |
+| L4 | Save each day's goal with that day's record | B | P0 | ⬜ | Depends on L1 |
+| L5 | ViewModel reads and writes through the repositories | A+B | P0 | ✅ | Data survives a restart |
+| L6 | JSON backup and restore | B | P1 | ⬜ | |
 
 ---
 
 ## Phase 3 — Week 7: Networking (separate exercise, not in the app)
 
-The app stays local-only, so the Week 7 networking requirement is met with a **separate small exercise**, as the course allows.
-
-| ID | Task | Role | Prio | Done when |
-|---|---|---|---|---|
-| N1 | Check with the course what the separate networking exercise must contain and how it is graded | C | P0 | Requirement written down here |
-| N2 | Build the exercise in its own module or repo folder, **not** part of the Steppy app | C | P0 | Runs and handles loading / error / offline |
-| N3 | Confirm the Steppy manifest has **no `INTERNET` permission** | C | P0 | Checked in a review |
+| ID | Task | Role | Prio | Status | Notes |
+|---|---|---|---|---|---|
+| N1 | Find out what the separate networking exercise must contain | C | P0 | ⬜ | |
+| N2 | Build the exercise outside the Steppy app | C | P0 | ⬜ | |
+| N3 | Steppy has no `INTERNET` permission | C | P0 | ✅ | Checked in the manifest |
 
 ## Phase 4 — Week 8: Sensor & notifications (test on a physical phone)
 
-| ID | Task | Role | Prio | Done when |
-|---|---|---|---|---|
-| P1 | `SensorStepRepository`: `TYPE_STEP_COUNTER` exposed as a `callbackFlow`, with a daily baseline (`today = current − baseline`) | C | P0 | Updates within 10 s of walking (US2) |
-| P2 | Reboot detection (`current < baseline`) and day rollover at midnight that closes the day | C+B | P0 | Tested on a real reboot and by changing the device clock |
-| P3 | `ACTIVITY_RECOGNITION` runtime permission. If it is denied or there is no sensor, use **manual step entry** and save those days as `MANUAL`. | C+A | P0 | Demoable: deny → manual entry works |
-| P4 | A WorkManager snapshot worker every 15 minutes, which also stores `stepsBeforeNoon` | C | P1 | The day closes correctly even if the app was not opened |
-| P5 | Daily reminder: notification channel, `POST_NOTIFICATIONS` on Android 13+, a worker that runs at the chosen time with "1,200 steps left to keep your 12-day streak", and no reminder once the goal is met | C | P0 | Denying notifications means the app works, just without reminders |
-| P6 | Make the debug "+500 steps" button exist only in debug builds | C | P1 | Not present in the release build |
+| ID | Task | Role | Prio | Status | Notes |
+|---|---|---|---|---|---|
+| P1 | Sensor repository with a daily baseline | C | P0 | ✅ | Still need to check the 10 s refresh on a real phone |
+| P2 | Reboot detection and day rollover | C+B | P0 | 🟡 | `DailyStepCalculator` handles both and has tests. **Bug:** at midnight Today keeps yesterday's steps, and a missed day doesn't reset the streak |
+| P3 | Permission denied or no sensor → manual entry | C+A | P0 | 🟡 | Works. Days aren't saved as `MANUAL`, because there's no history yet (L1) |
+| P4 | WorkManager snapshot every 15 min, plus `stepsBeforeNoon` | C | P1 | ⬜ | "Morning Mover" currently uses all of today's steps |
+| P5 | Daily reminder with `POST_NOTIFICATIONS` and a denial path | C | P0 | ⬜ | Only a toggle exists |
+| P6 | Simulated steps only in debug builds | C | P1 | 🟡 | `DebugFlags` is always `true`. Tie it to `BuildConfig.DEBUG` |
 
 ---
 
 ## Phase 5 — Week 9: M2 demo prep
 
-| ID | Task | Role | Prio |
-|---|---|---|---|
-| M1 | Write the demo script (below) and rehearse it twice, timed | All | P0 |
-| M2 | Fictional demo data, labelled as test data. Seed it with a debug action. | B | P0 |
-| M3 | Physical phone with screen mirroring (e.g. `scrcpy`), plus an emulator as a backup | C | P0 |
-| M4 | Accessibility pass: 48 dp targets, a TalkBack walkthrough of Today, 200% font size | A | P1 |
-| M5 | Check the course brief for any other M2 deliverables (slides, video, report). **They are not documented in this repo.** | All | P0 |
-| M6 | Update `AI_USE.md` and the README for M2 | All | P0 |
+| ID | Task | Role | Prio | Status |
+|---|---|---|---|---|
+| M1 | Write the demo script (below) and rehearse it twice, timed | All | P0 | ⬜ |
+| M2 | Fictional demo data, labelled as test data | B | P0 | ⬜ |
+| M3 | Physical phone with screen mirroring (e.g. `scrcpy`), plus an emulator as a backup | C | P0 | ⬜ |
+| M4 | Accessibility pass: 48 dp, TalkBack on Today, 200% font size | A | P1 | ⬜ |
+| M5 | Check the course brief for any other M2 deliverables | All | P0 | ⬜ |
+| M6 | Update `AI_USE.md` and the README for M2 | All | P0 | ⬜ |
 
 ### Demo script draft
 1. Fresh install → onboarding → **Today in under 60 s** (the measurable criterion)
-2. Step permission → **"Not now"** → manual entry works
+2. Step permission → **"Use manual step logging instead"** → manual entry works
 3. Add steps until "Goal reached" → streak +1, +50 XP
 4. Challenges: activate 3, then show that a 4th is blocked
 5. **Airplane mode** → every screen works exactly the same (the app is fully local)
@@ -123,19 +129,20 @@ The app stays local-only, so the Week 7 networking requirement is met with a **s
 
 ---
 
-## Open decisions (settle before or during Week 5)
+## Open decisions
 
-1. **Level formula:** thresholds (100/250/500/1000) or `floor(sqrt(xp/50))`. This blocks D2.
-2. **Level rewards:** implement mascot unlocks at levels 5 and 10, or drop "Next reward unlocked at Level 5" from Today.
-3. **Min SDK 29?** That assumes the test phone runs Android 10+.
-4. **Who is A, B and C?**
-5. **What the separate networking exercise needs** (N1).
+1. ~~Level formula~~ **Decided in the code:** `floor(sqrt(xp/50)) + 1`. Update PROJECT_PLAN §5 to match.
+2. **Level rewards:** implement them, or remove "Next reward unlocked…" from Today.
+3. ~~Min SDK~~ **Decided:** 26.
+4. **Room and DataStore (plan) or SharedPreferences (code)?** Room is the simplest way to store daily history (L1). Settings can stay in SharedPreferences if the plan is updated.
+5. **Who is A, B and C?** From the commits so far, Aitor is working on C (the `role-C-Platform-And-Network` branch) and Rubén on the UI screens.
+6. **What the separate networking exercise needs** (N1).
 
-## Dependency order
+## Suggested order for the remaining work
 
 ```
-F1 → F3 → (U*, D*, S1) → S2 → L1/L2/L3 → L5 → P1/P3 → M1
-          D* can start right after F3, in parallel with the UI
-          The networking exercise (N1–N2) is independent and can run in parallel
-          A sensor spike on the phone (P1) can start in Week 5 to reduce risk
+D1–D3 (pure logic + tests)  ─┐
+L1 + L4 (Room daily history) ─┼→ fix P2 rollover → U4/U6/U7 real data → M1 rehearsal
+P5 (reminder) + U3 Reminder screen ─ independent, can run in parallel
+F4, F5 (roles, AI_USE.md) ─ quick, do now
 ```
