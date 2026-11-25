@@ -1,7 +1,7 @@
 package com.steppy.app.ui
 
-import kotlin.math.floor
-import kotlin.math.sqrt
+import com.steppy.app.domain.LevelProgress
+import com.steppy.app.domain.XpCalculator
 
 enum class Mascot(val displayName: String, val emoji: String) {
     SLOTH("Sloth", "🦥"),
@@ -81,25 +81,25 @@ data class SteppyUiState(
         get() = todaySteps >= dailyGoal
 
     val totalXP: Int
-        get() = baseXP + (todaySteps / 100) + (if (isTodayGoalMet) 50 else 0)
+        get() = baseXP + XpCalculator.dayXp(todaySteps, dailyGoal)
+
+    private val levelProgress: LevelProgress
+        get() = XpCalculator.levelProgress(totalXP)
 
     val level: Int
-        get() = if (totalXP <= 0) 1 else floor(sqrt(totalXP / 50.0)).toInt() + 1
+        get() = levelProgress.level
 
     val currentLevelMinXP: Int
-        get() = ((level - 1) * (level - 1)) * 50
+        get() = levelProgress.currentLevelMinXp
 
     val nextLevelXP: Int
-        get() = (level * level) * 50
+        get() = levelProgress.nextLevelXp
 
     val xpToNextLevel: Int
-        get() = (nextLevelXP - totalXP).coerceAtLeast(0)
+        get() = levelProgress.xpToNextLevel
 
     val levelProgressFraction: Float
-        get() {
-            val range = (nextLevelXP - currentLevelMinXP).coerceAtLeast(1)
-            return ((totalXP - currentLevelMinXP).toFloat() / range).coerceIn(0f, 1f)
-        }
+        get() = levelProgress.fraction
 }
 
 fun defaultWeeklyBars(goal: Int, todaySteps: Int): List<DayBarUi> = listOf(
