@@ -1,0 +1,77 @@
+package com.steppy.app.data.repository
+
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.steppy.app.data.local.ProgressBaseline
+import com.steppy.app.data.local.StepSource
+import com.steppy.app.data.local.SteppyDatabase
+import com.steppy.app.data.local.UserChallenge
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.time.LocalDate
+
+@RunWith(AndroidJUnit4::class)
+class RoomDailyHistoryRepositoryTest {
+
+    private lateinit var db: SteppyDatabase
+    private lateinit var history: RoomDailyHistoryRepository
+
+    private val monday = LocalDate.of(2026, 11, 23)
+
+    @Before
+    fun createDb() {
+        db = Room.inMemoryDatabaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            SteppyDatabase::class.java
+        ).build()
+        history = RoomDailyHistoryRepository(db)
+    }
+
+    @After
+    fun closeDb() {
+        db.close()
+    }
+
+    @Test
+    fun firstSave_createsNewUserBaselineOnThatDay() = runBlocking {
+        history.saveDay(monday, 0, 6000, StepSource.SENSOR)
+        assertEquals(ProgressBaseline.newUser(monday), db.progressBaselineDao().get())
+
+        // Later days don't move the baseline
+        history.saveDay(monday.plusDays(1), 100, 6000, StepSource.SENSOR)
+        assertEquals(monday, db.progressBaselineDao().get()?.asOf)
+    }
+
+    @Test
+    fun saveDay_keepsStepsBeforeNoon() = runBlocking {
+        history.saveDay(monday, 1000, 6000, StepSource.SENSOR)
+        val withNoon = db.dailyRecordDao().get(monday)!!.copy(stepsBeforeNoon = 2100)
+        db.dailyRecordDao().upsert(withNoon)
+
+        history.saveDay(monday, 7000, 10000, StepSource.MANUAL)
+
+        val saved = db.dailyRecordDao().get(monday)!!
+        assertEquals(7000, saved.steps)
+        assertEquals(10000, saved.goal)
+        assertEquals(StepSource.MANUAL, saved.source)
+        assertEquals(2100, saved.stepsBeforeNoon)
+    }
+
+    @Test
+    fun clearAll_emptiesEverything() = runBlocking {
+        history.saveDay(monday, 1000, 6000, StepSource.SENSOR)
+        db.userChallengeDao().upsert(UserChallenge("c1", monday, null))
+
+        history.clearAll()
+
+        assertNull(db.dailyRecordDao().get(monday))
+        assertEquals(emptyList<UserChallenge>(), db.userChallengeDao().getAll())
+        assertNull(db.progressBaselineDao().get())
+    }
+}

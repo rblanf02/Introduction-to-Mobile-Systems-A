@@ -7,6 +7,7 @@ import com.steppy.app.ui.Mascot
 import com.steppy.app.ui.SteppyUiState
 import com.steppy.app.ui.defaultChallenges
 import com.steppy.app.ui.defaultWeeklyBars
+import java.time.LocalDate
 
 /**
  * Loads and saves the app state, so storage (SharedPreferences today, Room/DataStore later)
@@ -37,6 +38,8 @@ class LocalSteppyRepository(context: Context) : SteppyRepository {
         }.getOrDefault(ActivityLevel.SOMEWHAT_ACTIVE)
         val goal = prefs.getInt("daily_goal", 10000)
         val steps = prefs.getInt("today_steps", 0)
+        val stepsDate = prefs.getString("today_date", null)
+            ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
         val streak = prefs.getInt("streak", 0)
         val baseXp = prefs.getInt("base_xp", 0)
         val manual = prefs.getBoolean("manual_mode", false)
@@ -60,6 +63,7 @@ class LocalSteppyRepository(context: Context) : SteppyRepository {
             motivation = motivation,
             activityLevel = activityLevel,
             dailyGoal = goal,
+            todayDate = stepsDate,
             todaySteps = steps,
             currentStreak = streak,
             baseXP = baseXp,
@@ -82,6 +86,7 @@ class LocalSteppyRepository(context: Context) : SteppyRepository {
             .putString("activity_level", state.activityLevel.name)
             .putInt("daily_goal", state.dailyGoal)
             .putInt("today_steps", state.todaySteps)
+            .putString("today_date", state.todayDate?.toString())
             .putInt("streak", state.currentStreak)
             .putInt("base_xp", state.baseXP)
             .putBoolean("manual_mode", state.isManualMode)

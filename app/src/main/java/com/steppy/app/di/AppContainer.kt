@@ -3,7 +3,9 @@ package com.steppy.app.di
 import android.app.Activity
 import android.content.Context
 import com.steppy.app.data.local.SteppyDatabase
+import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.LocalSteppyRepository
+import com.steppy.app.data.repository.RoomDailyHistoryRepository
 import com.steppy.app.data.repository.SensorStepRepository
 import com.steppy.app.data.repository.StepRepository
 import com.steppy.app.data.repository.SteppyRepository
@@ -25,6 +27,8 @@ class AppContainer(context: Context) {
 
     /** Daily history, activated challenges and the progress baseline. Opened on first use. */
     val database: SteppyDatabase by lazy { SteppyDatabase.build(appContext) }
+
+    val dailyHistoryRepository: DailyHistoryRepository by lazy { RoomDailyHistoryRepository(database) }
 
     val platformPreferences: PlatformPreferences = PlatformPreferences(appContext)
 

@@ -5,6 +5,7 @@ import com.steppy.app.domain.ChallengeState
 import com.steppy.app.domain.LevelProgress
 import com.steppy.app.domain.MainMotivation
 import com.steppy.app.domain.XpCalculator
+import java.time.LocalDate
 
 enum class Mascot(val displayName: String, val emoji: String) {
     SLOTH("Sloth", "🦥"),
@@ -71,6 +72,8 @@ data class SteppyUiState(
     val activityLevel: ActivityLevel = ActivityLevel.SOMEWHAT_ACTIVE,
     val selectedMascot: Mascot = Mascot.SLOTH,
     val dailyGoal: Int = 10000,
+    /** The day [todaySteps] belongs to. Null until the ViewModel sets it. */
+    val todayDate: LocalDate? = null,
     val todaySteps: Int = 0,
     val currentStreak: Int = 0,
     val streakFreezes: Int = 1,
