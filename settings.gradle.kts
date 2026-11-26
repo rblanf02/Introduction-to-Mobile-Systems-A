@@ -24,4 +24,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Steppy"
 include(":app")
+// Week 7 networking exercise: a separate small app, so Steppy itself stays offline (no INTERNET permission)
+include(":network-exercise")
  
