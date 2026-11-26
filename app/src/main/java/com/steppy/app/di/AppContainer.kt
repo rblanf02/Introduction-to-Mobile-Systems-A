@@ -38,15 +38,16 @@ class AppContainer(context: Context) {
 
     val platformPreferences: PlatformPreferences = PlatformPreferences(appContext)
 
-    private val realSensor = StepSensorDataSource(appContext)
+    /** The phone's real step counter; also read by the snapshot worker (never simulated). */
+    val stepSensor: StepCounterSource = StepSensorDataSource(appContext)
 
     /** Not null only when the phone has no step sensor and simulation is turned on. */
     val simulatedCounter: SimulatedStepCounter? =
-        if (DebugFlags.SIMULATE_STEP_SENSOR_WHEN_MISSING && !realSensor.isAvailable()) {
+        if (DebugFlags.SIMULATE_STEP_SENSOR_WHEN_MISSING && !stepSensor.isAvailable()) {
             SimulatedStepCounter()
         } else null
 
-    private val counterSource: StepCounterSource = simulatedCounter ?: realSensor
+    private val counterSource: StepCounterSource = simulatedCounter ?: stepSensor
 
     /** Needs the Activity to check the runtime permission, so it is created per Activity. */
     fun createStepRepository(activity: Activity): StepRepository =

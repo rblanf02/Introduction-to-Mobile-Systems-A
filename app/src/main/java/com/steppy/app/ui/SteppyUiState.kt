@@ -85,6 +85,11 @@ data class SteppyUiState(
     /** The day [todaySteps] belongs to. Null until the ViewModel sets it. */
     val todayDate: LocalDate? = null,
     val todaySteps: Int = 0,
+    /**
+     * Today's steps by noon, for "Morning Mover". Grows until noon, then stays. Kept in the
+     * daily history (with the snapshot worker's value), not in the saved progress.
+     */
+    val stepsBeforeNoon: Int = 0,
     val currentStreak: Int = 0,
     /** Hearts: a new user has none; 1 is earned per 7-day streak (see StreakCalculator). */
     val streakFreezes: Int = 0,
@@ -170,7 +175,9 @@ fun SteppyUiState.withProgress(progress: ProgressSnapshot): SteppyUiState {
         date = progress.todayDate ?: LocalDate.now(),
         todaySteps = progress.todaySteps,
         streak = progress.streak,
-        weekSteps = progress.todaySteps
+        weekSteps = progress.todaySteps,
+        // Read from the restored history right after
+        stepsBeforeNoon = 0
     )
     val challenges = catalogueChallenges(inputs).map { item ->
         val completed = item.id in progress.completedChallengeIds
@@ -183,6 +190,7 @@ fun SteppyUiState.withProgress(progress: ProgressSnapshot): SteppyUiState {
     return copy(
         todayDate = progress.todayDate,
         todaySteps = progress.todaySteps,
+        stepsBeforeNoon = 0,
         currentStreak = progress.streak,
         baseXP = progress.baseXp,
         totalHistoricalSteps = progress.todaySteps,

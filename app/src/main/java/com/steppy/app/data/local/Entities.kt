@@ -16,12 +16,32 @@ enum class StepSource { SENSOR, MANUAL }
 fun StepSource.mergedWith(earlier: StepSource?): StepSource =
     if (earlier == StepSource.MANUAL) StepSource.MANUAL else this
 
+/**
+ * Combines a new save of a day with the record already stored for it. The app and the
+ * snapshot worker both save today, each with its own count, so the larger one wins:
+ * - steps and steps before noon never go down (a late save with an older count changes nothing)
+ * - steps before noon stay unknown (null) until a save before noon gives them
+ * - the new goal is kept, and a MANUAL day stays MANUAL
+ */
+fun DailyRecord.mergedWith(existing: DailyRecord?): DailyRecord {
+    if (existing == null) return this
+    val mergedSteps = maxOf(steps, existing.steps)
+    val mergedBeforeNoon = listOfNotNull(stepsBeforeNoon, existing.stepsBeforeNoon)
+        .maxOrNull()
+        ?.coerceAtMost(mergedSteps)
+    return copy(
+        steps = mergedSteps,
+        stepsBeforeNoon = mergedBeforeNoon,
+        source = source.mergedWith(existing.source)
+    )
+}
+
 /** One row per day. Streak, hearts, XP and the charts are calculated from these rows. */
 @Entity(tableName = "daily_records")
 data class DailyRecord(
     @PrimaryKey val date: LocalDate,
     val steps: Int,
-    /** Saved by the snapshot worker (P4); used by "Morning Mover". Null until then. */
+    /** Steps by noon, from the last save before 12:00 (±15 min); used by "Morning Mover". Null if none. */
     val stepsBeforeNoon: Int?,
     /** The goal *on that day*: changing the goal must not rewrite history. */
     val goal: Int,

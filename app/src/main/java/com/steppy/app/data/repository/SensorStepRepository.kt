@@ -3,7 +3,6 @@ package com.steppy.app.data.repository
 import android.app.Activity
 import com.steppy.app.platform.PlatformPreferences
 import com.steppy.app.platform.permission.ActivityRecognitionPermission
-import com.steppy.app.domain.DailyStepCalculator
 import com.steppy.app.domain.DailyStepRecord
 import com.steppy.app.platform.sensor.StepCounterSource
 import com.steppy.app.platform.sensor.StepSensorDataSource
@@ -33,13 +32,8 @@ class SensorStepRepository (
 
         }
 
-        sensor.stepSinceReboot().collect { counterNow -> val previous: DailyStepRecord? =
-        preferences.loadStepRecord()
-
-            val today: LocalDate = LocalDate.now()
-            val record: DailyStepRecord = DailyStepCalculator.calculate(previous, counterNow,today)
-
-            preferences.saveStepRecord(record)
+        sensor.stepSinceReboot().collect { counterNow ->
+            val record: DailyStepRecord = preferences.recordCounter(counterNow, LocalDate.now())
             emit(StepTrackingState.Tracking(record.todaySteps))
         }
 

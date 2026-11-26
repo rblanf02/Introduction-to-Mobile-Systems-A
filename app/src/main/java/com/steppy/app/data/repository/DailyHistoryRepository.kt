@@ -18,10 +18,21 @@ interface DailyHistoryRepository {
 
     /**
      * Creates or updates the record for [date]. The first record ever saved also creates
-     * the new-user [ProgressBaseline], starting on that date. A day saved as MANUAL once
-     * stays MANUAL (see [com.steppy.app.data.local.mergedWith]).
+     * the new-user [ProgressBaseline], starting on that date. Steps never go down, and a day
+     * saved as MANUAL once stays MANUAL (see [DailyRecord.mergedWith]).
+     *
+     * @param stepsBeforeNoon today's steps when saved before noon; null keeps the stored value
      */
-    suspend fun saveDay(date: LocalDate, steps: Int, goal: Int, source: StepSource)
+    suspend fun saveDay(
+        date: LocalDate,
+        steps: Int,
+        goal: Int,
+        source: StepSource,
+        stepsBeforeNoon: Int? = null
+    )
+
+    /** The record for [date], or null if there is none. */
+    suspend fun getDay(date: LocalDate): DailyRecord?
 
     /** "Delete my data": removes every record, challenge and the baseline. */
     suspend fun clearAll()
@@ -52,7 +63,13 @@ fun replayStreakBefore(baseline: ProgressBaseline?, records: List<DailyRecord>, 
 
 class RoomDailyHistoryRepository(private val db: SteppyDatabase) : DailyHistoryRepository {
 
-    override suspend fun saveDay(date: LocalDate, steps: Int, goal: Int, source: StepSource) {
+    override suspend fun saveDay(
+        date: LocalDate,
+        steps: Int,
+        goal: Int,
+        source: StepSource,
+        stepsBeforeNoon: Int?
+    ) {
         db.withTransaction {
             val baselineDao = db.progressBaselineDao()
             if (baselineDao.get() == null) {
@@ -60,19 +77,18 @@ class RoomDailyHistoryRepository(private val db: SteppyDatabase) : DailyHistoryR
             }
 
             val recordDao = db.dailyRecordDao()
-            val existing = recordDao.get(date)
-            recordDao.upsert(
-                DailyRecord(
-                    date = date,
-                    steps = steps,
-                    // Written by the snapshot worker (P4), so keep it
-                    stepsBeforeNoon = existing?.stepsBeforeNoon,
-                    goal = goal,
-                    source = source.mergedWith(existing?.source)
-                )
+            val record = DailyRecord(
+                date = date,
+                steps = steps,
+                stepsBeforeNoon = stepsBeforeNoon,
+                goal = goal,
+                source = source
             )
+            recordDao.upsert(record.mergedWith(recordDao.get(date)))
         }
     }
+
+    override suspend fun getDay(date: LocalDate): DailyRecord? = db.dailyRecordDao().get(date)
 
     override suspend fun clearAll() {
         db.withTransaction { deleteEverything() }

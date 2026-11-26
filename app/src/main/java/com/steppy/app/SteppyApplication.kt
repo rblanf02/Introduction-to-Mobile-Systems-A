@@ -2,6 +2,7 @@ package com.steppy.app
 
 import android.app.Application
 import com.steppy.app.di.AppContainer
+import com.steppy.app.platform.work.StepSnapshotWorker
 
 class SteppyApplication : Application() {
 
@@ -11,5 +12,6 @@ class SteppyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        StepSnapshotWorker.schedule(this)
     }
 }

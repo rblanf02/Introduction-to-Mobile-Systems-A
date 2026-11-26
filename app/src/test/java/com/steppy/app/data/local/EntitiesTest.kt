@@ -74,4 +74,34 @@ class EntitiesTest {
         assertEquals(StepSource.MANUAL, StepSource.MANUAL.mergedWith(StepSource.SENSOR))
         assertEquals(StepSource.MANUAL, StepSource.SENSOR.mergedWith(StepSource.MANUAL))
     }
+
+    private val day = LocalDate.of(2026, 11, 25)
+
+    private fun record(steps: Int, noon: Int? = null, goal: Int = 6000, source: StepSource = StepSource.SENSOR) =
+        DailyRecord(day, steps, noon, goal, source)
+
+    @Test
+    fun recordMerge_noExistingRecord_keepsTheNewOne() {
+        assertEquals(record(1000, 400), record(1000, 400).mergedWith(null))
+    }
+
+    @Test
+    fun recordMerge_stepsNeverGoDown() {
+        assertEquals(9000, record(2000).mergedWith(record(9000)).steps)
+        assertEquals(9500, record(9500).mergedWith(record(9000)).steps)
+    }
+
+    @Test
+    fun recordMerge_stepsBeforeNoon_keepTheLargerKnownValue() {
+        assertEquals(2400, record(5000, noon = null).mergedWith(record(3000, noon = 2400)).stepsBeforeNoon)
+        assertEquals(2600, record(5000, noon = 2600).mergedWith(record(3000, noon = 2400)).stepsBeforeNoon)
+        assertNull(record(5000).mergedWith(record(3000)).stepsBeforeNoon)
+    }
+
+    @Test
+    fun recordMerge_newGoalWins_andManualStaysManual() {
+        val merged = record(1000, goal = 8000).mergedWith(record(500, goal = 6000, source = StepSource.MANUAL))
+        assertEquals(8000, merged.goal)
+        assertEquals(StepSource.MANUAL, merged.source)
+    }
 }

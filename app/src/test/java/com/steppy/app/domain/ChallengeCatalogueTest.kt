@@ -62,8 +62,8 @@ class ChallengeCatalogueTest {
         val friday = LocalDate.of(2026, 11, 27)
         val saturday = friday.plusDays(1)
         val sunday = friday.plusDays(2)
-        assertEquals(0, ChallengeProgressInputs.forToday(friday, 5000, 0, 5000).weekendSteps)
-        assertEquals(5000, ChallengeProgressInputs.forToday(saturday, 5000, 0, 5000).weekendSteps)
-        assertEquals(5000, ChallengeProgressInputs.forToday(sunday, 5000, 0, 5000).weekendSteps)
+        assertEquals(0, ChallengeProgressInputs.forToday(friday, 5000, 0, 5000, stepsBeforeNoon = 0).weekendSteps)
+        assertEquals(5000, ChallengeProgressInputs.forToday(saturday, 5000, 0, 5000, stepsBeforeNoon = 0).weekendSteps)
+        assertEquals(5000, ChallengeProgressInputs.forToday(sunday, 5000, 0, 5000, stepsBeforeNoon = 0).weekendSteps)
     }
 }

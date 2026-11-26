@@ -109,4 +109,16 @@ class RoomDailyHistoryRepositoryTest {
         assertEquals(StepSource.MANUAL, db.dailyRecordDao().get(monday)?.source)
         assertEquals(4000, db.dailyRecordDao().get(monday)?.steps)
     }
+
+    @Test
+    fun appAndWorkerSaves_keepTheLargerCount_andStepsBeforeNoon() = runBlocking {
+        // Worker in the morning, then a later save from the app with an older count
+        history.saveDay(monday, 2500, 6000, StepSource.SENSOR, stepsBeforeNoon = 2500)
+        history.saveDay(monday, 1800, 6000, StepSource.SENSOR)
+
+        val record = db.dailyRecordDao().get(monday)!!
+        assertEquals(2500, record.steps)
+        assertEquals(2500, record.stepsBeforeNoon)
+        assertEquals(record, history.getDay(monday))
+    }
 }

@@ -11,11 +11,13 @@ import com.steppy.app.data.repository.replayStreakBefore
 import com.steppy.app.data.settings.SettingsRepository
 import com.steppy.app.data.settings.UserSettings
 import com.steppy.app.domain.ActivityLevel
+import com.steppy.app.domain.ChallengeCatalogue
 import com.steppy.app.domain.MainMotivation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -25,6 +27,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
+import java.time.LocalTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SteppyViewModelHistoryTest {
@@ -32,21 +35,27 @@ class SteppyViewModelHistoryTest {
     private data class SavedDay(val steps: Int, val goal: Int, val source: StepSource)
 
     private class FakeHistory : DailyHistoryRepository {
-        val days = mutableMapOf<LocalDate, SavedDay>()
+        val records = mutableMapOf<LocalDate, DailyRecord>()
+        val days: Map<LocalDate, SavedDay>
+            get() = records.mapValues { (_, r) -> SavedDay(r.steps, r.goal, r.source) }
         var baseline: ProgressBaseline? = null
-        override suspend fun saveDay(date: LocalDate, steps: Int, goal: Int, source: StepSource) {
+        override suspend fun saveDay(
+            date: LocalDate,
+            steps: Int,
+            goal: Int,
+            source: StepSource,
+            stepsBeforeNoon: Int?
+        ) {
             if (baseline == null) baseline = ProgressBaseline.newUser(date)
-            // Same rule as the Room repository
-            days[date] = SavedDay(steps, goal, source.mergedWith(days[date]?.source))
+            // Same merge as the Room repository
+            records[date] = DailyRecord(date, steps, stepsBeforeNoon, goal, source).mergedWith(records[date])
         }
-        override suspend fun clearAll() { days.clear(); baseline = null }
+        override suspend fun getDay(date: LocalDate) = records[date]
+        override suspend fun clearAll() { records.clear(); baseline = null }
         override suspend fun exportAll() = HistoryData(null, emptyList(), emptyList())
         override suspend fun replaceAll(data: HistoryData) = Unit
-        override suspend fun streakBefore(date: LocalDate) = replayStreakBefore(
-            baseline,
-            days.map { (d, day) -> DailyRecord(d, day.steps, null, day.goal, day.source) },
-            date
-        )
+        override suspend fun streakBefore(date: LocalDate) =
+            replayStreakBefore(baseline, records.values.sortedBy { it.date }, date)
     }
 
     /** Progress and settings together; the settings part is served through a fake SettingsRepository. */
@@ -67,13 +76,20 @@ class SteppyViewModelHistoryTest {
     private val wednesday = monday.plusDays(2)
 
     private var clock = monday
+    /** Afternoon by default, so steps before noon only change in the tests about them. */
+    private var time: LocalTime = LocalTime.of(15, 0)
     private val history = FakeHistory()
 
     private fun onboardedState(todayDate: LocalDate? = monday, steps: Int = 0, goal: Int = 6000) =
         SteppyUiState(isOnboardingCompleted = true, todayDate = todayDate, todaySteps = steps, dailyGoal = goal)
 
     private fun viewModel(settings: FakeSettings) =
-        SteppyViewModel(settings, FakeSettingsRepository(settings.saved.settings()), history) { clock }
+        SteppyViewModel(
+            settings,
+            FakeSettingsRepository(settings.saved.settings()),
+            history,
+            timeOfDay = { time }
+        ) { clock }
 
     @Before
     fun setUp() {
@@ -333,5 +349,102 @@ class SteppyViewModelHistoryTest {
 
         vm.completeOnboarding(manualFallbackMode = false)
         assertFalse(vm.uiState.value.isManualMode)
+    }
+
+    // Steps before noon and the snapshot worker's records (P4)
+
+    private val morning = LocalTime.of(10, 0)
+    private val afternoon = LocalTime.of(13, 0)
+
+    private fun withActiveMorningMover(state: SteppyUiState) = state.copy(
+        challenges = state.challenges.map {
+            if (it.id == ChallengeCatalogue.MORNING_MOVER) it.copy(isActive = true) else it
+        }
+    )
+
+    private fun SteppyViewModel.morningMover() =
+        uiState.value.challenges.single { it.id == ChallengeCatalogue.MORNING_MOVER }
+
+    @Test
+    fun stepsInTheMorning_areSavedAsStepsBeforeNoon() {
+        time = morning
+        val vm = viewModel(FakeSettings(onboardedState()))
+        vm.onSensorStepsUpdated(1500)
+
+        assertEquals(1500, vm.uiState.value.stepsBeforeNoon)
+        assertEquals(1500, history.records[monday]?.stepsBeforeNoon)
+    }
+
+    @Test
+    fun stepsAfterNoon_doNotChangeStepsBeforeNoon() {
+        time = morning
+        val vm = viewModel(FakeSettings(onboardedState()))
+        vm.onSensorStepsUpdated(1500)
+
+        time = afternoon
+        vm.onSensorStepsUpdated(4500)
+
+        assertEquals(1500, vm.uiState.value.stepsBeforeNoon)
+        assertEquals(1500, history.records[monday]?.stepsBeforeNoon)
+        assertEquals(4500, history.records[monday]?.steps)
+    }
+
+    @Test
+    fun morningMover_countsOnlyStepsBeforeNoon() {
+        time = afternoon
+        val vm = viewModel(FakeSettings(withActiveMorningMover(onboardedState())))
+        vm.onSensorStepsUpdated(5000)
+
+        assertFalse(vm.morningMover().isCompleted)
+        assertEquals(0, vm.morningMover().currentProgress)
+    }
+
+    @Test
+    fun morningMover_completesWithEnoughStepsBeforeNoon() {
+        time = morning
+        val vm = viewModel(FakeSettings(withActiveMorningMover(onboardedState())))
+        vm.onSensorStepsUpdated(2100)
+
+        assertTrue(vm.morningMover().isCompleted)
+    }
+
+    @Test
+    fun morningStepsSavedByTheWorker_areReadWhenTheAppOpens() = runTest {
+        // The worker saved this morning's steps while the app was closed
+        history.saveDay(monday, 2600, 6000, StepSource.SENSOR, stepsBeforeNoon = 2400)
+
+        time = afternoon
+        val vm = viewModel(FakeSettings(withActiveMorningMover(onboardedState())))
+
+        assertEquals(2400, vm.uiState.value.stepsBeforeNoon)
+        assertTrue(vm.morningMover().isCompleted)
+    }
+
+    @Test
+    fun newDay_startsStepsBeforeNoonAtZero() {
+        time = morning
+        val vm = viewModel(FakeSettings(onboardedState()))
+        vm.onSensorStepsUpdated(1500)
+
+        clock = tuesday
+        vm.checkDayRollover()
+
+        assertEquals(0, vm.uiState.value.stepsBeforeNoon)
+        assertEquals(1500, history.records[monday]?.stepsBeforeNoon)
+    }
+
+    @Test
+    fun dayClosedByTheWorker_isNotLoweredByTheAppsOlderCount() = runTest {
+        // The app last counted 2,000 steps on Monday; the worker saved 9,000 later that day
+        val settings = FakeSettings(onboardedState(steps = 2000))
+        history.saveDay(monday, 9000, 6000, StepSource.SENSOR)
+
+        clock = tuesday
+        val vm = viewModel(settings)
+
+        assertEquals(9000, history.records[monday]?.steps)
+        assertEquals(0, vm.uiState.value.todaySteps)
+        // Monday's goal was met, so the streak counts it
+        assertEquals(1, vm.uiState.value.currentStreak)
     }
 }

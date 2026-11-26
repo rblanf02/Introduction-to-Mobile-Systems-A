@@ -1,6 +1,7 @@
 package com.steppy.app.ui
 
 import com.steppy.app.data.backup.HistoryData
+import com.steppy.app.data.local.DailyRecord
 import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.SteppyRepository
@@ -22,6 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
+import java.time.LocalTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SteppyViewModelSettingsTest {
@@ -45,7 +47,14 @@ class SteppyViewModelSettingsTest {
     }
 
     private object NoHistory : DailyHistoryRepository {
-        override suspend fun saveDay(date: LocalDate, steps: Int, goal: Int, source: StepSource) = Unit
+        override suspend fun saveDay(
+            date: LocalDate,
+            steps: Int,
+            goal: Int,
+            source: StepSource,
+            stepsBeforeNoon: Int?
+        ) = Unit
+        override suspend fun getDay(date: LocalDate): DailyRecord? = null
         override suspend fun clearAll() = Unit
         override suspend fun exportAll() = HistoryData(null, emptyList(), emptyList())
         override suspend fun replaceAll(data: HistoryData) = Unit
@@ -65,7 +74,7 @@ class SteppyViewModelSettingsTest {
     )
 
     private fun viewModel(progress: FakeProgress, settings: FakeSettingsRepository) =
-        SteppyViewModel(progress, settings, NoHistory) { monday }
+        SteppyViewModel(progress, settings, NoHistory, timeOfDay = { LocalTime.of(15, 0) }) { monday }
 
     @Before
     fun setUp() {

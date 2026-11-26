@@ -19,6 +19,7 @@ import com.steppy.app.domain.ChallengeEvaluator
 import com.steppy.app.domain.ChallengeProgressInputs
 import com.steppy.app.domain.DayProgress
 import com.steppy.app.domain.MainMotivation
+import com.steppy.app.domain.MorningSteps
 import com.steppy.app.domain.StreakCalculator
 import com.steppy.app.domain.StreakState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,11 +31,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
+import java.time.LocalTime
 
 class SteppyViewModel(
     private val repository: SteppyRepository,
     private val settingsRepository: SettingsRepository,
     private val history: DailyHistoryRepository,
+    private val timeOfDay: () -> LocalTime = { LocalTime.now() },
     private val today: () -> LocalDate = { LocalDate.now() }
 ) : ViewModel() {
 
@@ -93,19 +96,56 @@ class SteppyViewModel(
     }
 
     /**
-     * Reads the streak and hearts from the daily history, so a missed day resets the streak
-     * (or uses a heart). Queued behind earlier history writes, such as yesterday's final record.
+     * Reads from the daily history:
+     * - the streak and hearts, so a missed day resets the streak (or uses a heart)
+     * - today's steps before noon, which the snapshot worker may have saved while the app was closed
+     * Then checks the challenges again with them. Queued behind earlier history writes,
+     * such as yesterday's final record.
      */
     private fun refreshStreak() {
         val date = _uiState.value.todayDate ?: return
         viewModelScope.launch {
-            val before = historyLock.withLock { history.streakBefore(date) } ?: return@launch
+            val (before, todayRecord) = historyLock.withLock {
+                history.streakBefore(date) to history.getDay(date)
+            }
             // The day changed meanwhile; the refresh for the new day sets it
             if (_uiState.value.todayDate != date) return@launch
-            streakBase = StreakBase(date, before)
-            updateAndPersist { it.withStreak(before, it.todaySteps, it.dailyGoal) }
+            if (before == null && todayRecord?.stepsBeforeNoon == null) return@launch
+            before?.let { streakBase = StreakBase(date, it) }
+            updateAndPersist { state ->
+                val refreshed = (before?.let { state.withStreak(it, state.todaySteps, state.dailyGoal) } ?: state)
+                    .copy(stepsBeforeNoon = maxOf(state.stepsBeforeNoon, todayRecord?.stepsBeforeNoon ?: 0))
+                val (evaluated, evaluation) = evaluateChallenges(refreshed)
+                evaluated.copy(
+                    statusBannerMessage = completionMessage(refreshed, evaluation) ?: refreshed.statusBannerMessage
+                )
+            }
         }
     }
+
+    /** Reads every challenge's progress from [state] and adds the XP of newly completed ones. */
+    private fun evaluateChallenges(state: SteppyUiState): Pair<SteppyUiState, ChallengeEvaluation> {
+        val inputs = ChallengeProgressInputs.forToday(
+            date = state.todayDate ?: today(),
+            todaySteps = state.todaySteps,
+            streak = state.currentStreak,
+            weekSteps = state.totalHistoricalSteps,
+            stepsBeforeNoon = state.stepsBeforeNoon
+        )
+        val evaluation = ChallengeEvaluator.evaluate(
+            state.challenges.map { it.toChallengeState() },
+            ChallengeCatalogue.progressById(inputs)
+        )
+        val evaluated = state.copy(
+            baseXP = state.baseXP + evaluation.xpAwarded,
+            challenges = state.challenges.withChallengeStates(evaluation.challenges)
+        )
+        return evaluated to evaluation
+    }
+
+    /** Today's steps by noon if it is still morning on [date]; null once noon has passed. */
+    private fun stepsBeforeNoonNow(date: LocalDate, todaySteps: Int): Int? =
+        if (date == today()) MorningSteps.stepsBeforeNoon(timeOfDay(), todaySteps) else null
 
     /** @param source how the steps in this update were counted; null when no steps were added */
     private fun updateAndPersist(
@@ -139,12 +179,24 @@ class SteppyViewModel(
     private fun saveTodayRecord(state: SteppyUiState, added: StepSource? = null) {
         val date = state.todayDate ?: return
         if (!state.isOnboardingCompleted) return
-        saveRecord(date, state.todaySteps, state.dailyGoal, stepSource(state, added))
+        saveRecord(
+            date,
+            state.todaySteps,
+            state.dailyGoal,
+            stepSource(state, added),
+            stepsBeforeNoonNow(date, state.todaySteps)
+        )
     }
 
-    private fun saveRecord(date: LocalDate, steps: Int, goal: Int, source: StepSource) {
+    private fun saveRecord(
+        date: LocalDate,
+        steps: Int,
+        goal: Int,
+        source: StepSource,
+        stepsBeforeNoon: Int? = null
+    ) {
         viewModelScope.launch {
-            historyLock.withLock { history.saveDay(date, steps, goal, source) }
+            historyLock.withLock { history.saveDay(date, steps, goal, source, stepsBeforeNoon) }
         }
     }
 
@@ -181,6 +233,7 @@ class SteppyViewModel(
             it.copy(
                 todayDate = now,
                 todaySteps = 0,
+                stepsBeforeNoon = 0,
                 weeklyBars = defaultWeeklyBars(it.dailyGoal, 0),
                 statusBannerMessage = null
             )
@@ -231,33 +284,22 @@ class SteppyViewModel(
             val wasGoalMet = state.isTodayGoalMet
             val newSteps = (state.todaySteps + stepsToAdd).coerceAtMost(200000)
             val isNowGoalMet = newSteps >= state.dailyGoal
-            val withStreak = state.withStreak(streakBefore(state), newSteps, state.dailyGoal)
-            val newStreak = withStreak.currentStreak
             val newWeeklyTotal = state.weeklyBars.filter { !it.isToday }.sumOf { it.steps } + newSteps
+            val date = state.todayDate ?: today()
 
-            val progressById = ChallengeCatalogue.progressById(
-                ChallengeProgressInputs.forToday(
-                    date = state.todayDate ?: today(),
-                    todaySteps = newSteps,
-                    streak = newStreak,
-                    weekSteps = newWeeklyTotal
-                )
+            val stepped = state.withStreak(streakBefore(state), newSteps, state.dailyGoal).copy(
+                todaySteps = newSteps,
+                stepsBeforeNoon = stepsBeforeNoonNow(date, newSteps) ?: state.stepsBeforeNoon,
+                totalHistoricalSteps = newWeeklyTotal,
+                weeklyBars = defaultWeeklyBars(state.dailyGoal, newSteps)
             )
-            val evaluation = ChallengeEvaluator.evaluate(
-                state.challenges.map { it.toChallengeState() },
-                progressById
-            )
+            val (evaluated, evaluation) = evaluateChallenges(stepped)
 
             val goalMessage = if (!wasGoalMet && isNowGoalMet) {
                 "Daily goal reached! Streak +1 and +50 bonus XP!"
             } else null
 
-            withStreak.copy(
-                todaySteps = newSteps,
-                totalHistoricalSteps = newWeeklyTotal,
-                baseXP = state.baseXP + evaluation.xpAwarded,
-                weeklyBars = defaultWeeklyBars(state.dailyGoal, newSteps),
-                challenges = state.challenges.withChallengeStates(evaluation.challenges),
+            evaluated.copy(
                 statusBannerMessage = listOfNotNull(goalMessage, completionMessage(state, evaluation))
                     .joinToString(" ")
                     .ifEmpty { null }

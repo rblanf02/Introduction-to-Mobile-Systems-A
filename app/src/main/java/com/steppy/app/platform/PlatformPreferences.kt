@@ -2,6 +2,7 @@ package com.steppy.app.platform
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.steppy.app.domain.DailyStepCalculator
 import com.steppy.app.domain.DailyStepRecord
 import java.time.LocalDate
 
@@ -45,6 +46,17 @@ class PlatformPreferences (context: Context){
             .putInt(KEY_TODAY_STEPS, record.todaySteps)
             .apply()
     }
+    /**
+     * Adds a new sensor reading to today's count and saves it. The app and the snapshot
+     * worker both call this, so it runs one call at a time: a reading is never counted twice.
+     */
+    @Synchronized
+    fun recordCounter(counterNow: Int, today: LocalDate): DailyStepRecord {
+        val record = DailyStepCalculator.calculate(loadStepRecord(), counterNow, today)
+        saveStepRecord(record)
+        return record
+    }
+
     fun wasPermissionAsked(): Boolean {
         return prefs.getBoolean(KEY_PERMISSION_ASKED, false)
     }

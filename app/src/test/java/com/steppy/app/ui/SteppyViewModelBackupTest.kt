@@ -26,6 +26,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
+import java.time.LocalTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SteppyViewModelBackupTest {
@@ -45,10 +46,16 @@ class SteppyViewModelBackupTest {
     /** Keeps a full [HistoryData], like the Room tables. */
     private class FakeHistory(var data: HistoryData = HistoryData(null, emptyList(), emptyList())) :
         DailyHistoryRepository {
-        override suspend fun saveDay(date: LocalDate, steps: Int, goal: Int, source: StepSource) {
-            // Same rule as the Room repository: a MANUAL day stays MANUAL
-            val earlier = data.days.firstOrNull { it.date == date }?.source
-            val record = DailyRecord(date, steps, null, goal, source.mergedWith(earlier))
+        override suspend fun saveDay(
+            date: LocalDate,
+            steps: Int,
+            goal: Int,
+            source: StepSource,
+            stepsBeforeNoon: Int?
+        ) {
+            // Same merge as the Room repository
+            val record = DailyRecord(date, steps, stepsBeforeNoon, goal, source)
+                .mergedWith(data.days.firstOrNull { it.date == date })
             data = data.copy(
                 baseline = data.baseline ?: ProgressBaseline.newUser(date),
                 days = (data.days.filter { it.date != date } + record).sortedBy { it.date }
@@ -56,6 +63,7 @@ class SteppyViewModelBackupTest {
         }
         override suspend fun clearAll() { data = HistoryData(null, emptyList(), emptyList()) }
         override suspend fun exportAll() = data
+        override suspend fun getDay(date: LocalDate) = data.days.firstOrNull { it.date == date }
         override suspend fun replaceAll(data: HistoryData) { this.data = data }
         override suspend fun streakBefore(date: LocalDate) = replayStreakBefore(data.baseline, data.days, date)
     }
@@ -87,7 +95,7 @@ class SteppyViewModelBackupTest {
         val p = FakeProgress(progress)
         val s = FakeSettingsRepository(settings)
         val h = FakeHistory(history)
-        return Phone(p, s, h, SteppyViewModel(p, s, h) { clock })
+        return Phone(p, s, h, SteppyViewModel(p, s, h, timeOfDay = { LocalTime.of(15, 0) }) { clock })
     }
 
     /** An onboarded phone with yesterday's record, today's steps and an activated challenge. */

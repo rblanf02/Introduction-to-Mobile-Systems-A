@@ -50,16 +50,23 @@ data class ChallengeProgressInputs(
     companion object {
         /**
          * Inputs when only today's steps are known.
-         * Until the history is read (U7) and snapshots exist (P4), weekend steps are today's
-         * steps on a Saturday or Sunday, and steps before noon are all of today's steps.
+         * Until the history is read (U7), weekend steps are today's steps on a Saturday or Sunday.
+         *
+         * @param stepsBeforeNoon today's steps by noon (see [MorningSteps]), 0 if unknown
          */
-        fun forToday(date: LocalDate, todaySteps: Int, streak: Int, weekSteps: Int) =
+        fun forToday(
+            date: LocalDate,
+            todaySteps: Int,
+            streak: Int,
+            weekSteps: Int,
+            stepsBeforeNoon: Int
+        ) =
             ChallengeProgressInputs(
                 todaySteps = todaySteps,
                 streak = streak,
                 weekSteps = weekSteps,
                 weekendSteps = if (date.isWeekend()) todaySteps else 0,
-                stepsBeforeNoon = todaySteps
+                stepsBeforeNoon = stepsBeforeNoon
             )
 
         private fun LocalDate.isWeekend() =
