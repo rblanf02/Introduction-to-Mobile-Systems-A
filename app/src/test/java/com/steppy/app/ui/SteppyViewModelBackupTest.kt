@@ -7,6 +7,7 @@ import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.local.UserChallenge
 import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.SteppyRepository
+import com.steppy.app.data.repository.replayStreakBefore
 import com.steppy.app.data.settings.SettingsRepository
 import com.steppy.app.data.settings.UserSettings
 import com.steppy.app.domain.MainMotivation
@@ -53,6 +54,7 @@ class SteppyViewModelBackupTest {
         override suspend fun clearAll() { data = HistoryData(null, emptyList(), emptyList()) }
         override suspend fun exportAll() = data
         override suspend fun replaceAll(data: HistoryData) { this.data = data }
+        override suspend fun streakBefore(date: LocalDate) = replayStreakBefore(data.baseline, data.days, date)
     }
 
     private val monday = LocalDate.of(2026, 11, 23)

@@ -8,6 +8,7 @@ import com.steppy.app.data.settings.SettingsRepository
 import com.steppy.app.data.settings.UserSettings
 import com.steppy.app.domain.ActivityLevel
 import com.steppy.app.domain.MainMotivation
+import com.steppy.app.domain.StreakState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -48,6 +49,7 @@ class SteppyViewModelSettingsTest {
         override suspend fun clearAll() = Unit
         override suspend fun exportAll() = HistoryData(null, emptyList(), emptyList())
         override suspend fun replaceAll(data: HistoryData) = Unit
+        override suspend fun streakBefore(date: LocalDate): StreakState? = null
     }
 
     private val monday = LocalDate.of(2026, 11, 23)

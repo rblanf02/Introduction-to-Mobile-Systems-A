@@ -86,7 +86,8 @@ data class SteppyUiState(
     val todayDate: LocalDate? = null,
     val todaySteps: Int = 0,
     val currentStreak: Int = 0,
-    val streakFreezes: Int = 1,
+    /** Hearts: a new user has none; 1 is earned per 7-day streak (see StreakCalculator). */
+    val streakFreezes: Int = 0,
     val weeklyActiveDays: Int = 0,
     val baseXP: Int = 0,
     val totalHistoricalSteps: Int = 0,

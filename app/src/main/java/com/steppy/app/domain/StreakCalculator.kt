@@ -76,4 +76,20 @@ object StreakCalculator {
 
         return StreakState(streak, hearts, streakLostOn)
     }
+
+    /**
+     * The state at the end of the day before [today]: every past day is replayed and
+     * today is left out, so the result doesn't change while today's steps grow.
+     * Add today on top with [withToday].
+     */
+    fun stateBefore(
+        start: StreakState,
+        days: List<DayProgress>,
+        from: LocalDate,
+        today: LocalDate
+    ): StreakState = calculate(start, days.filter { it.date.isBefore(today) }, from, today)
+
+    /** [before] plus today's progress: +1 (and maybe a heart) once today's goal is met. */
+    fun withToday(before: StreakState, today: DayProgress): StreakState =
+        calculate(before, listOf(today), today.date, today.date)
 }

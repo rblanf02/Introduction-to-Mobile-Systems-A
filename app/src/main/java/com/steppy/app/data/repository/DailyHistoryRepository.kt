@@ -6,6 +6,10 @@ import com.steppy.app.data.local.DailyRecord
 import com.steppy.app.data.local.ProgressBaseline
 import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.local.SteppyDatabase
+import com.steppy.app.data.local.toDayProgress
+import com.steppy.app.data.local.toStreakState
+import com.steppy.app.domain.StreakCalculator
+import com.steppy.app.domain.StreakState
 import java.time.LocalDate
 
 /** Saves one record per day, each with the goal that applied on that day. */
@@ -25,6 +29,23 @@ interface DailyHistoryRepository {
 
     /** Restoring a backup: replaces the whole history with [data], all at once or not at all. */
     suspend fun replaceAll(data: HistoryData)
+
+    /**
+     * Streak and hearts at the end of the day before [date], replayed from the baseline.
+     * A day with no record counts as missed. Null when there is no baseline yet (no day saved).
+     */
+    suspend fun streakBefore(date: LocalDate): StreakState?
+}
+
+/** The replay behind [DailyHistoryRepository.streakBefore], shared with the test fakes. */
+fun replayStreakBefore(baseline: ProgressBaseline?, records: List<DailyRecord>, date: LocalDate): StreakState? {
+    if (baseline == null) return null
+    return StreakCalculator.stateBefore(
+        start = baseline.toStreakState(),
+        days = records.map { it.toDayProgress() },
+        from = baseline.asOf,
+        today = date
+    )
 }
 
 class RoomDailyHistoryRepository(private val db: SteppyDatabase) : DailyHistoryRepository {
@@ -70,6 +91,12 @@ class RoomDailyHistoryRepository(private val db: SteppyDatabase) : DailyHistoryR
             db.dailyRecordDao().upsertAll(data.days)
             db.userChallengeDao().upsertAll(data.challenges)
         }
+    }
+
+    override suspend fun streakBefore(date: LocalDate): StreakState? = db.withTransaction {
+        val baseline = db.progressBaselineDao().get()
+        val records = baseline?.let { db.dailyRecordDao().getFrom(it.asOf) }.orEmpty()
+        replayStreakBefore(baseline, records, date)
     }
 
     private suspend fun deleteEverything() {

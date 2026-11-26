@@ -115,4 +115,42 @@ class StreakCalculatorTest {
     fun streakAlreadyZero_missedDay_doesNotRecordLoss() {
         assertNull(run("..x").streakLostOn)
     }
+
+    @Test
+    fun stateBefore_leavesTodayOut_evenWhenItsGoalIsMet() {
+        val days = listOf(met(0), met(1), met(2))
+        val before = StreakCalculator.stateBefore(StreakState(), days, day(0), day(2))
+        assertEquals(2, before.streak)
+    }
+
+    @Test
+    fun stateBefore_dayWithNoRecord_countsAsMissed() {
+        val before = StreakCalculator.stateBefore(StreakState(), listOf(met(0)), day(0), day(2))
+        assertEquals(0, before.streak)
+        assertEquals(day(1), before.streakLostOn)
+    }
+
+    @Test
+    fun stateBefore_thenWithToday_matchesCalculate() {
+        val days = "xxxxxx.xxxxxxx".mapIndexed { i, c -> if (c == 'x') met(i) else missed(i) }
+        val today = days.last()
+        val before = StreakCalculator.stateBefore(StreakState(), days, day(0), today.date)
+        assertEquals(
+            StreakCalculator.calculate(StreakState(), days, day(0), today.date),
+            StreakCalculator.withToday(before, today)
+        )
+    }
+
+    @Test
+    fun withToday_goalNotMet_changesNothing() {
+        val before = StreakState(streak = 5, hearts = 1)
+        assertEquals(before, StreakCalculator.withToday(before, missed(0)))
+    }
+
+    @Test
+    fun withToday_seventhDay_earnsAHeart() {
+        val result = StreakCalculator.withToday(StreakState(streak = 6), met(0))
+        assertEquals(7, result.streak)
+        assertEquals(1, result.hearts)
+    }
 }

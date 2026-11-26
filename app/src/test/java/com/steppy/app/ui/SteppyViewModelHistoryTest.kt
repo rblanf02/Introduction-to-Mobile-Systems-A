@@ -1,9 +1,12 @@
 package com.steppy.app.ui
 
 import com.steppy.app.data.backup.HistoryData
+import com.steppy.app.data.local.DailyRecord
+import com.steppy.app.data.local.ProgressBaseline
 import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.SteppyRepository
+import com.steppy.app.data.repository.replayStreakBefore
 import com.steppy.app.data.settings.SettingsRepository
 import com.steppy.app.data.settings.UserSettings
 import com.steppy.app.domain.ActivityLevel
@@ -28,12 +31,19 @@ class SteppyViewModelHistoryTest {
 
     private class FakeHistory : DailyHistoryRepository {
         val days = mutableMapOf<LocalDate, SavedDay>()
+        var baseline: ProgressBaseline? = null
         override suspend fun saveDay(date: LocalDate, steps: Int, goal: Int, source: StepSource) {
+            if (baseline == null) baseline = ProgressBaseline.newUser(date)
             days[date] = SavedDay(steps, goal, source)
         }
-        override suspend fun clearAll() = days.clear()
+        override suspend fun clearAll() { days.clear(); baseline = null }
         override suspend fun exportAll() = HistoryData(null, emptyList(), emptyList())
         override suspend fun replaceAll(data: HistoryData) = Unit
+        override suspend fun streakBefore(date: LocalDate) = replayStreakBefore(
+            baseline,
+            days.map { (d, day) -> DailyRecord(d, day.steps, null, day.goal, day.source) },
+            date
+        )
     }
 
     /** Progress and settings together; the settings part is served through a fake SettingsRepository. */
@@ -51,6 +61,7 @@ class SteppyViewModelHistoryTest {
 
     private val monday = LocalDate.of(2026, 11, 23)
     private val tuesday = monday.plusDays(1)
+    private val wednesday = monday.plusDays(2)
 
     private var clock = monday
     private val history = FakeHistory()
@@ -179,5 +190,86 @@ class SteppyViewModelHistoryTest {
 
         vm.completeOnboarding(manualFallbackMode = false)
         assertEquals(0, history.days[monday]?.steps)
+    }
+
+    // Streak from the daily history (P2)
+
+    @Test
+    fun goalMetYesterday_newDayKeepsTheStreak_andTodaysGoalAddsOne() {
+        val vm = viewModel(FakeSettings(onboardedState()))
+        vm.addSteps(6000)
+        assertEquals(1, vm.uiState.value.currentStreak)
+
+        clock = tuesday
+        vm.checkDayRollover()
+        assertEquals(1, vm.uiState.value.currentStreak)
+
+        vm.addSteps(6000)
+        assertEquals(2, vm.uiState.value.currentStreak)
+    }
+
+    @Test
+    fun missedDay_resetsTheStreakWhenTheAppOpens() {
+        val settings = FakeSettings(onboardedState())
+        viewModel(settings).addSteps(6000)
+        assertEquals(1, settings.saved.currentStreak)
+
+        // Tuesday has no record (the app wasn't opened), so it counts as missed
+        clock = wednesday
+        val vm = viewModel(settings)
+
+        assertEquals(0, vm.uiState.value.currentStreak)
+        assertEquals(0, settings.saved.currentStreak)
+    }
+
+    @Test
+    fun missedDay_whileTheAppStaysOpen_resetsTheStreak() {
+        val vm = viewModel(FakeSettings(onboardedState()))
+        vm.addSteps(6000)
+
+        clock = tuesday
+        vm.addSteps(100)
+        clock = wednesday
+        vm.checkDayRollover()
+
+        assertEquals(0, vm.uiState.value.currentStreak)
+    }
+
+    @Test
+    fun sevenDayStreak_earnsAHeart_thatSavesTheStreakOnAMissedDay() {
+        val vm = viewModel(FakeSettings(onboardedState()))
+        repeat(7) { i ->
+            clock = monday.plusDays(i.toLong())
+            vm.addSteps(6000)
+        }
+        assertEquals(7, vm.uiState.value.currentStreak)
+        assertEquals(1, vm.uiState.value.streakFreezes)
+
+        // Day 8 is missed; on day 9 the heart is used and the streak stays
+        clock = monday.plusDays(8)
+        vm.checkDayRollover()
+
+        assertEquals(7, vm.uiState.value.currentStreak)
+        assertEquals(0, vm.uiState.value.streakFreezes)
+    }
+
+    @Test
+    fun loweringTheGoalBelowTodaysSteps_countsTodayForTheStreak() {
+        val vm = viewModel(FakeSettings(onboardedState(goal = 6000)))
+        vm.addSteps(4000)
+        assertEquals(0, vm.uiState.value.currentStreak)
+
+        vm.updateDailyGoal(3000)
+        assertEquals(1, vm.uiState.value.currentStreak)
+
+        vm.updateDailyGoal(10000)
+        assertEquals(0, vm.uiState.value.currentStreak)
+    }
+
+    @Test
+    fun streakInStorageWithoutHistory_isKeptUntilADayIsSaved() {
+        // Not onboarded: nothing is saved to the history, so there's nothing to replay
+        val vm = viewModel(FakeSettings(SteppyUiState(todayDate = monday, currentStreak = 3)))
+        assertEquals(3, vm.uiState.value.currentStreak)
     }
 }

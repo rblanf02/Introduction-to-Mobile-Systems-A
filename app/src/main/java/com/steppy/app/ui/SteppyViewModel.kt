@@ -17,7 +17,10 @@ import com.steppy.app.domain.ChallengeCatalogue
 import com.steppy.app.domain.ChallengeEvaluation
 import com.steppy.app.domain.ChallengeEvaluator
 import com.steppy.app.domain.ChallengeProgressInputs
+import com.steppy.app.domain.DayProgress
 import com.steppy.app.domain.MainMotivation
+import com.steppy.app.domain.StreakCalculator
+import com.steppy.app.domain.StreakState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,12 +55,51 @@ class SteppyViewModel(
     /** A valid backup file the user picked, waiting for them to confirm the restore. */
     val pendingRestore: StateFlow<Backup?> = _pendingRestore.asStateFlow()
 
+    /** Streak and hearts at the end of the day before [StreakBase.date], read from the history. */
+    private data class StreakBase(val date: LocalDate, val state: StreakState)
+
+    /** Null until the history has been read for the current day. */
+    private var streakBase: StreakBase? = null
+
     init {
         viewModelScope.launch {
             val settings = settingsRepository.load()
             savedSettings = settings
             _uiState.update { it.withSettings(settings).copy(isLoaded = true) }
-            checkDayRollover()
+            rollOverIfNewDay()
+            refreshStreak()
+        }
+    }
+
+    /**
+     * The streak before today. Until the history has been read, it is worked out from the
+     * saved streak, which already includes today if today's goal is met.
+     */
+    private fun streakBefore(state: SteppyUiState): StreakState =
+        streakBase?.takeIf { it.date == state.todayDate }?.state
+            ?: StreakState(
+                streak = (state.currentStreak - if (state.isTodayGoalMet) 1 else 0).coerceAtLeast(0),
+                hearts = state.streakFreezes
+            )
+
+    /** Streak and hearts once today's [steps] and [goal] are added to [before]. */
+    private fun SteppyUiState.withStreak(before: StreakState, steps: Int, goal: Int): SteppyUiState {
+        val now = StreakCalculator.withToday(before, DayProgress(todayDate ?: today(), steps, goal))
+        return copy(currentStreak = now.streak, streakFreezes = now.hearts)
+    }
+
+    /**
+     * Reads the streak and hearts from the daily history, so a missed day resets the streak
+     * (or uses a heart). Queued behind earlier history writes, such as yesterday's final record.
+     */
+    private fun refreshStreak() {
+        val date = _uiState.value.todayDate ?: return
+        viewModelScope.launch {
+            val before = historyLock.withLock { history.streakBefore(date) } ?: return@launch
+            // The day changed meanwhile; the refresh for the new day sets it
+            if (_uiState.value.todayDate != date) return@launch
+            streakBase = StreakBase(date, before)
+            updateAndPersist { it.withStreak(before, it.todaySteps, it.dailyGoal) }
         }
     }
 
@@ -97,22 +139,28 @@ class SteppyViewModel(
     /**
      * Starts a new day if the date changed since the steps were last counted: yesterday's
      * record is saved with its final steps and goal, and today starts at 0.
+     * The streak is then read again from the history, so a missed day resets it.
      * Called at startup, when the app comes back to the screen, and before every step update.
      */
     fun checkDayRollover() {
+        if (rollOverIfNewDay()) refreshStreak()
+    }
+
+    /** The day change itself; returns true if a new day started. */
+    private fun rollOverIfNewDay(): Boolean {
         val now = today()
         val state = _uiState.value
         // Runs again once loading ends
-        if (!state.isLoaded) return
+        if (!state.isLoaded) return false
         val countedDate = state.todayDate
 
         if (countedDate == null) {
             // Data saved before dates were stored: assume the steps are today's
             updateAndPersist { it.copy(todayDate = now) }
-            return
+            return false
         }
         // Same day, or the clock moved back: keep counting on the current day
-        if (!now.isAfter(countedDate)) return
+        if (!now.isAfter(countedDate)) return false
 
         if (state.isOnboardingCompleted) {
             saveRecord(countedDate, state.todaySteps, state.dailyGoal, stepSource(state))
@@ -125,6 +173,7 @@ class SteppyViewModel(
                 statusBannerMessage = null
             )
         }
+        return true
     }
 
     fun saveProfileSetup(
@@ -165,7 +214,8 @@ class SteppyViewModel(
             val wasGoalMet = state.isTodayGoalMet
             val newSteps = (state.todaySteps + stepsToAdd).coerceAtMost(200000)
             val isNowGoalMet = newSteps >= state.dailyGoal
-            val newStreak = if (!wasGoalMet && isNowGoalMet) state.currentStreak + 1 else state.currentStreak
+            val withStreak = state.withStreak(streakBefore(state), newSteps, state.dailyGoal)
+            val newStreak = withStreak.currentStreak
             val newWeeklyTotal = state.weeklyBars.filter { !it.isToday }.sumOf { it.steps } + newSteps
 
             val progressById = ChallengeCatalogue.progressById(
@@ -185,9 +235,8 @@ class SteppyViewModel(
                 "Daily goal reached! Streak +1 and +50 bonus XP!"
             } else null
 
-            state.copy(
+            withStreak.copy(
                 todaySteps = newSteps,
-                currentStreak = newStreak,
                 totalHistoricalSteps = newWeeklyTotal,
                 baseXP = state.baseXP + evaluation.xpAwarded,
                 weeklyBars = defaultWeeklyBars(state.dailyGoal, newSteps),
@@ -245,7 +294,8 @@ class SteppyViewModel(
         val validGoal = newGoal.coerceIn(500, 50000)
         checkDayRollover()
         updateAndPersist { state ->
-            state.copy(
+            // A new goal can meet (or un-meet) today's goal, which changes today's streak
+            state.withStreak(streakBefore(state), state.todaySteps, validGoal).copy(
                 dailyGoal = validGoal,
                 weeklyBars = defaultWeeklyBars(validGoal, state.todaySteps),
                 statusBannerMessage = "Daily goal updated to $validGoal steps."
@@ -271,6 +321,7 @@ class SteppyViewModel(
     fun resetAllData() {
         repository.clearAllData()
         _uiState.value = SteppyUiState(isLoaded = true, todayDate = today())
+        streakBase = StreakBase(today(), StreakState())
         savedSettings = UserSettings()
         viewModelScope.launch {
             settingsLock.withLock { settingsRepository.clear() }
@@ -332,6 +383,7 @@ class SteppyViewModel(
             .withProgress(backup.progress)
             .copy(statusBannerMessage = "Backup restored.")
         _uiState.value = restored
+        streakBase = null
         repository.saveState(restored)
         savedSettings = backup.settings
         viewModelScope.launch {
@@ -342,7 +394,9 @@ class SteppyViewModel(
         }
         // A backup from an earlier day: close that day and start today at 0.
         // Its history write queues behind the restore above.
-        checkDayRollover()
+        rollOverIfNewDay()
+        // The streak comes from the restored history, read after the writes above
+        refreshStreak()
     }
 
     private fun showMessage(message: String) {
