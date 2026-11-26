@@ -178,4 +178,19 @@ class SteppyViewModelSettingsTest {
         assertFalse(vm.uiState.value.isManualMode)
         assertFalse(settings.settings.isManualMode)
     }
+
+    @Test
+    fun notificationsDenied_turnsRemindersOff_andSaysTheAppStillWorks() {
+        val settings = FakeSettingsRepository(onboarded.copy(remindersEnabled = true))
+        val vm = viewModel(FakeProgress(SteppyUiState(todayDate = monday)), settings)
+
+        vm.onNotificationsDenied()
+
+        assertFalse(vm.uiState.value.remindersEnabled)
+        assertFalse(settings.settings.remindersEnabled)
+        assertEquals(
+            "Notifications are off, so there are no reminders. Steppy works the same without them.",
+            vm.uiState.value.statusBannerMessage
+        )
+    }
 }

@@ -397,6 +397,16 @@ class SteppyViewModel(
         updateAndPersist { it.copy(remindersEnabled = enabled) }
     }
 
+    /** The notification permission was denied: reminders stay off, everything else works. */
+    fun onNotificationsDenied() {
+        updateAndPersist {
+            it.copy(
+                remindersEnabled = false,
+                statusBannerMessage = "Notifications are off, so there are no reminders. Steppy works the same without them."
+            )
+        }
+    }
+
     fun resetAllData() {
         repository.clearAllData()
         _uiState.value = SteppyUiState(isLoaded = true, todayDate = today())

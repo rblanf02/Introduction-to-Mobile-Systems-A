@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.steppy.app.platform.backup.rememberBackupFileActions
+import com.steppy.app.platform.notifications.rememberReminderControls
 import com.steppy.app.ui.SteppyViewModel
 import com.steppy.app.ui.components.BottomTab
 import com.steppy.app.ui.components.SteppyBottomNavigationBar
@@ -107,11 +108,15 @@ fun SteppyApp(viewModel: SteppyViewModel,
                 }
                 composable(BottomTab.PROFILE.route) {
                     val backupFiles = rememberBackupFileActions(viewModel)
+                    val reminders = rememberReminderControls(viewModel)
                     ProfileScreen(
                         uiState = uiState,
                         onUpdateGoal = viewModel::updateDailyGoal,
                         onUpdateProfile = viewModel::updateUsernameAndMascot,
-                        onToggleReminders = viewModel::toggleReminders,
+                        onToggleReminders = reminders.onToggleReminders,
+                        notificationsAllowed = reminders.notificationsAllowed,
+                        onAllowNotifications = reminders.onAllowNotifications,
+                        onSendTestReminder = reminders.onSendTestReminder,
                         onResetAllData = viewModel::resetAllData,
                         onBackupToFile = backupFiles.saveBackup,
                         onRestoreFromFile = backupFiles.pickRestoreFile

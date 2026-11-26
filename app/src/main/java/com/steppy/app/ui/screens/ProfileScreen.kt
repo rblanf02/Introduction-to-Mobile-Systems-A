@@ -15,6 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +40,11 @@ fun ProfileScreen(
     onUpdateProfile: (String, Mascot) -> Unit,
     onToggleReminders: (Boolean) -> Unit,
     onResetAllData: () -> Unit,
+    /** False when Android blocks Steppy's notifications; reminders then can't be shown. */
+    notificationsAllowed: Boolean = true,
+    onAllowNotifications: () -> Unit = {},
+    /** Demo only: shows tonight's reminder now. Null hides the button. */
+    onSendTestReminder: (() -> Unit)? = null,
     onBackupToFile: () -> Unit = {},
     onRestoreFromFile: () -> Unit = {}
 ) {
@@ -196,15 +203,49 @@ fun ProfileScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Notifications",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = SteppyDarkNavy
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Daily reminder",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = SteppyDarkNavy
+                        )
+                        Text(
+                            text = "At 7:00 pm, only if today's goal isn't reached yet",
+                            fontSize = 13.sp,
+                            color = SteppyTextGray
+                        )
+                    }
                     Switch(
-                        checked = uiState.remindersEnabled,
-                        onCheckedChange = onToggleReminders
+                        // Shown off while Android blocks notifications, as no reminder can appear
+                        checked = uiState.remindersEnabled && notificationsAllowed,
+                        onCheckedChange = onToggleReminders,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Daily reminder at 7 pm"
+                        }
+                    )
+                }
+                if (!notificationsAllowed) {
+                    Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp)) {
+                        Text(
+                            text = "Notifications are off for Steppy. Everything else works the same.",
+                            fontSize = 13.sp,
+                            color = SteppyTextGray
+                        )
+                        TextButton(
+                            onClick = onAllowNotifications,
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                        ) {
+                            Text("Allow notifications", color = SteppyTealDark, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                if (onSendTestReminder != null) {
+                    HorizontalDivider(color = SteppyDivider)
+                    SettingsRow(
+                        title = "Send a test reminder (demo)",
+                        onClick = onSendTestReminder
                     )
                 }
                 HorizontalDivider(color = SteppyDivider)

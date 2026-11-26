@@ -20,6 +20,7 @@ class PlatformPreferences (context: Context){
         private const val KEY_LAST_COUNTER = "step_record_last_counter"
         private const val KEY_TODAY_STEPS = "step_record_today_steps"
         private const val KEY_PERMISSION_ASKED = "permission_asked"
+        private const val KEY_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
 
         private const val  PREFERENCE_NAME = "steppy_platform"
     }
@@ -63,6 +64,14 @@ class PlatformPreferences (context: Context){
 
     fun setPermissionAsked() {
         prefs.edit().putBoolean(KEY_PERMISSION_ASKED, true).apply()
+    }
+
+    /** POST_NOTIFICATIONS (Android 13+) was asked at least once. */
+    fun wasNotificationPermissionAsked(): Boolean =
+        prefs.getBoolean(KEY_NOTIFICATION_PERMISSION_ASKED, false)
+
+    fun setNotificationPermissionAsked() {
+        prefs.edit().putBoolean(KEY_NOTIFICATION_PERMISSION_ASKED, true).apply()
     }
 
 }
