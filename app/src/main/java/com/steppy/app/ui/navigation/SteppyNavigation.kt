@@ -14,6 +14,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.steppy.app.platform.backup.rememberBackupFileActions
 import com.steppy.app.ui.SteppyViewModel
 import com.steppy.app.ui.components.BottomTab
 import com.steppy.app.ui.components.SteppyBottomNavigationBar
@@ -25,6 +26,7 @@ fun SteppyApp(viewModel: SteppyViewModel,
               showManualEntry: Boolean = true) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val pendingRestore by viewModel.pendingRestore.collectAsState()
 
     LaunchedEffect(uiState.statusBannerMessage) {
         uiState.statusBannerMessage?.let { msg ->
@@ -44,6 +46,13 @@ fun SteppyApp(viewModel: SteppyViewModel,
             onFinishOnboarding = viewModel::completeOnboarding
         )
     } else {
+        pendingRestore?.let { backup ->
+            RestoreConfirmDialog(
+                backup = backup,
+                onConfirm = viewModel::confirmRestore,
+                onDismiss = viewModel::cancelRestore
+            )
+        }
         val navController = rememberNavController()
         val backStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = backStackEntry?.destination?.route
@@ -97,12 +106,15 @@ fun SteppyApp(viewModel: SteppyViewModel,
                     )
                 }
                 composable(BottomTab.PROFILE.route) {
+                    val backupFiles = rememberBackupFileActions(viewModel)
                     ProfileScreen(
                         uiState = uiState,
                         onUpdateGoal = viewModel::updateDailyGoal,
                         onUpdateProfile = viewModel::updateUsernameAndMascot,
                         onToggleReminders = viewModel::toggleReminders,
-                        onResetAllData = viewModel::resetAllData
+                        onResetAllData = viewModel::resetAllData,
+                        onBackupToFile = backupFiles.saveBackup,
+                        onRestoreFromFile = backupFiles.pickRestoreFile
                     )
                 }
             }

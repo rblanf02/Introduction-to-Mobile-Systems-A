@@ -1,9 +1,9 @@
 package com.steppy.app.data.repository
 
 import android.content.Context
-import com.steppy.app.domain.ChallengeProgressInputs
 import com.steppy.app.ui.SteppyUiState
-import com.steppy.app.ui.catalogueChallenges
+import com.steppy.app.ui.progressSnapshot
+import com.steppy.app.ui.withProgress
 import java.time.LocalDate
 
 /**
@@ -18,6 +18,18 @@ interface SteppyRepository {
     fun clearAllData()
 }
 
+/** Today's progress as it is stored: what [SteppyRepository] saves and a backup contains. */
+data class ProgressSnapshot(
+    /** The day [todaySteps] belongs to. Null in data saved before dates were stored. */
+    val todayDate: LocalDate?,
+    val todaySteps: Int,
+    val streak: Int,
+    /** XP from past days and completed challenges; today's step XP is added on top. */
+    val baseXp: Int,
+    val activeChallengeIds: Set<String>,
+    val completedChallengeIds: Set<String>
+)
+
 /**
  * Local implementation backed by SharedPreferences: the data survives an app restart.
  * The settings that used to be in this file are moved to DataStore on first launch.
@@ -26,50 +38,28 @@ class LocalSteppyRepository(context: Context) : SteppyRepository {
     private val prefs = context.getSharedPreferences("steppy_local_db", Context.MODE_PRIVATE)
 
     override fun loadInitialState(): SteppyUiState {
-        val steps = prefs.getInt("today_steps", 0)
-        val stepsDate = prefs.getString("today_date", null)
-            ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-        val streak = prefs.getInt("streak", 0)
-        val baseXp = prefs.getInt("base_xp", 0)
-        val activeIds = prefs.getStringSet("active_challenges", emptySet()) ?: setOf("c1", "c2")
-        val completedIds = prefs.getStringSet("completed_challenges", emptySet()) ?: emptySet()
-
-        val progressInputs = ChallengeProgressInputs.forToday(
-            date = stepsDate ?: LocalDate.now(),
-            todaySteps = steps,
-            streak = streak,
-            weekSteps = steps
+        val snapshot = ProgressSnapshot(
+            todayDate = prefs.getString("today_date", null)
+                ?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
+            todaySteps = prefs.getInt("today_steps", 0),
+            streak = prefs.getInt("streak", 0),
+            baseXp = prefs.getInt("base_xp", 0),
+            activeChallengeIds = prefs.getStringSet("active_challenges", null) ?: emptySet(),
+            completedChallengeIds = prefs.getStringSet("completed_challenges", null) ?: emptySet()
         )
-        val challenges = catalogueChallenges(progressInputs).map { item ->
-            val completed = completedIds.contains(item.id)
-            item.copy(
-                isActive = activeIds.contains(item.id),
-                isCompleted = completed,
-                currentProgress = if (completed) item.targetProgress else item.currentProgress
-            )
-        }
-
-        return SteppyUiState(
-            todayDate = stepsDate,
-            todaySteps = steps,
-            currentStreak = streak,
-            baseXP = baseXp,
-            totalHistoricalSteps = steps,
-            challenges = challenges
-        )
+        return SteppyUiState().withProgress(snapshot)
     }
 
     override fun saveState(state: SteppyUiState) {
-        val activeIds = state.challenges.filter { it.isActive }.map { it.id }.toSet()
-        val completedIds = state.challenges.filter { it.isCompleted }.map { it.id }.toSet()
+        val snapshot = state.progressSnapshot()
         prefs.edit()
             // Never write the settings keys here: the DataStore migration would copy them again
-            .putInt("today_steps", state.todaySteps)
-            .putString("today_date", state.todayDate?.toString())
-            .putInt("streak", state.currentStreak)
-            .putInt("base_xp", state.baseXP)
-            .putStringSet("active_challenges", activeIds)
-            .putStringSet("completed_challenges", completedIds)
+            .putInt("today_steps", snapshot.todaySteps)
+            .putString("today_date", snapshot.todayDate?.toString())
+            .putInt("streak", snapshot.streak)
+            .putInt("base_xp", snapshot.baseXp)
+            .putStringSet("active_challenges", snapshot.activeChallengeIds)
+            .putStringSet("completed_challenges", snapshot.completedChallengeIds)
             .apply()
     }
 

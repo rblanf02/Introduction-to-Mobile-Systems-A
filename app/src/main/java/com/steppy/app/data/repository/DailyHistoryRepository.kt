@@ -1,6 +1,7 @@
 package com.steppy.app.data.repository
 
 import androidx.room.withTransaction
+import com.steppy.app.data.backup.HistoryData
 import com.steppy.app.data.local.DailyRecord
 import com.steppy.app.data.local.ProgressBaseline
 import com.steppy.app.data.local.StepSource
@@ -18,6 +19,12 @@ interface DailyHistoryRepository {
 
     /** "Delete my data": removes every record, challenge and the baseline. */
     suspend fun clearAll()
+
+    /** Everything in the history, for a backup. */
+    suspend fun exportAll(): HistoryData
+
+    /** Restoring a backup: replaces the whole history with [data], all at once or not at all. */
+    suspend fun replaceAll(data: HistoryData)
 }
 
 class RoomDailyHistoryRepository(private val db: SteppyDatabase) : DailyHistoryRepository {
@@ -45,10 +52,29 @@ class RoomDailyHistoryRepository(private val db: SteppyDatabase) : DailyHistoryR
     }
 
     override suspend fun clearAll() {
+        db.withTransaction { deleteEverything() }
+    }
+
+    override suspend fun exportAll(): HistoryData = db.withTransaction {
+        HistoryData(
+            baseline = db.progressBaselineDao().get(),
+            days = db.dailyRecordDao().getAll(),
+            challenges = db.userChallengeDao().getAll()
+        )
+    }
+
+    override suspend fun replaceAll(data: HistoryData) {
         db.withTransaction {
-            db.dailyRecordDao().deleteAll()
-            db.userChallengeDao().deleteAll()
-            db.progressBaselineDao().deleteAll()
+            deleteEverything()
+            data.baseline?.let { db.progressBaselineDao().upsert(it) }
+            db.dailyRecordDao().upsertAll(data.days)
+            db.userChallengeDao().upsertAll(data.challenges)
         }
+    }
+
+    private suspend fun deleteEverything() {
+        db.dailyRecordDao().deleteAll()
+        db.userChallengeDao().deleteAll()
+        db.progressBaselineDao().deleteAll()
     }
 }

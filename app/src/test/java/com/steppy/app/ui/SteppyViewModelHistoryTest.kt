@@ -1,5 +1,6 @@
 package com.steppy.app.ui
 
+import com.steppy.app.data.backup.HistoryData
 import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.SteppyRepository
@@ -31,6 +32,8 @@ class SteppyViewModelHistoryTest {
             days[date] = SavedDay(steps, goal, source)
         }
         override suspend fun clearAll() = days.clear()
+        override suspend fun exportAll() = HistoryData(null, emptyList(), emptyList())
+        override suspend fun replaceAll(data: HistoryData) = Unit
     }
 
     /** Progress and settings together; the settings part is served through a fake SettingsRepository. */

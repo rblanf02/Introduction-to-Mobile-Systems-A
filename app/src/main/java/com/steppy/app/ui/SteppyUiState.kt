@@ -1,5 +1,6 @@
 package com.steppy.app.ui
 
+import com.steppy.app.data.repository.ProgressSnapshot
 import com.steppy.app.data.settings.UserSettings
 import com.steppy.app.domain.ActivityLevel
 import com.steppy.app.domain.ChallengeCatalogue
@@ -151,6 +152,43 @@ fun SteppyUiState.withSettings(settings: UserSettings): SteppyUiState = copy(
     remindersEnabled = settings.remindersEnabled,
     weeklyBars = defaultWeeklyBars(settings.dailyGoal, todaySteps)
 )
+
+/** The part of the state kept in [com.steppy.app.data.repository.SteppyRepository]. */
+fun SteppyUiState.progressSnapshot(): ProgressSnapshot = ProgressSnapshot(
+    todayDate = todayDate,
+    todaySteps = todaySteps,
+    streak = currentStreak,
+    baseXp = baseXP,
+    activeChallengeIds = challenges.filter { it.isActive }.map { it.id }.toSet(),
+    completedChallengeIds = challenges.filter { it.isCompleted }.map { it.id }.toSet()
+)
+
+/** Replaces today's progress and rebuilds the challenges from the catalogue. */
+fun SteppyUiState.withProgress(progress: ProgressSnapshot): SteppyUiState {
+    val inputs = ChallengeProgressInputs.forToday(
+        date = progress.todayDate ?: LocalDate.now(),
+        todaySteps = progress.todaySteps,
+        streak = progress.streak,
+        weekSteps = progress.todaySteps
+    )
+    val challenges = catalogueChallenges(inputs).map { item ->
+        val completed = item.id in progress.completedChallengeIds
+        item.copy(
+            isActive = item.id in progress.activeChallengeIds,
+            isCompleted = completed,
+            currentProgress = if (completed) item.targetProgress else item.currentProgress
+        )
+    }
+    return copy(
+        todayDate = progress.todayDate,
+        todaySteps = progress.todaySteps,
+        currentStreak = progress.streak,
+        baseXP = progress.baseXp,
+        totalHistoricalSteps = progress.todaySteps,
+        weeklyBars = defaultWeeklyBars(dailyGoal, progress.todaySteps),
+        challenges = challenges
+    )
+}
 
 fun defaultWeeklyBars(goal: Int, todaySteps: Int): List<DayBarUi> = listOf(
     DayBarUi("L", "Monday", 0, goal),

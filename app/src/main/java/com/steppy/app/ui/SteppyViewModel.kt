@@ -3,6 +3,9 @@ package com.steppy.app.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.steppy.app.data.backup.Backup
+import com.steppy.app.data.backup.BackupCodec
+import com.steppy.app.data.backup.BackupReadResult
 import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.SteppyRepository
@@ -43,6 +46,11 @@ class SteppyViewModel(
 
     /** The settings last read or written, so unchanged settings are not written again. */
     private var savedSettings: UserSettings? = null
+
+    private val _pendingRestore = MutableStateFlow<Backup?>(null)
+
+    /** A valid backup file the user picked, waiting for them to confirm the restore. */
+    val pendingRestore: StateFlow<Backup?> = _pendingRestore.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -270,6 +278,75 @@ class SteppyViewModel(
         viewModelScope.launch {
             historyLock.withLock { history.clearAll() }
         }
+    }
+
+    /**
+     * The backup file's text: settings, today's progress and the full history.
+     * Waits for earlier history writes, so today's latest steps are included.
+     */
+    suspend fun createBackupJson(): String {
+        val history = historyLock.withLock { history.exportAll() }
+        val state = _uiState.value
+        return BackupCodec.encode(
+            Backup(
+                createdOn = today(),
+                settings = state.settings(),
+                progress = state.progressSnapshot(),
+                history = history
+            )
+        )
+    }
+
+    fun onBackupSaved(success: Boolean) {
+        showMessage(if (success) "Backup saved." else "The backup couldn't be saved. Try another location.")
+    }
+
+    /**
+     * Checks a file picked for restore. A valid backup waits in [pendingRestore] for the
+     * user to confirm; nothing is replaced yet.
+     *
+     * @param text the file's text, or null if it couldn't be read
+     */
+    fun onRestoreFileRead(text: String?) {
+        if (text == null) {
+            showMessage("The file couldn't be opened. Nothing was changed.")
+            return
+        }
+        when (val result = BackupCodec.decode(text)) {
+            is BackupReadResult.Invalid -> showMessage("${result.reason} Nothing was changed.")
+            is BackupReadResult.Valid -> _pendingRestore.value = result.backup
+        }
+    }
+
+    fun cancelRestore() {
+        _pendingRestore.value = null
+    }
+
+    /** Replaces the settings, today's progress and the whole history with the pending backup. */
+    fun confirmRestore() {
+        val backup = _pendingRestore.value ?: return
+        _pendingRestore.value = null
+
+        val restored = SteppyUiState(isLoaded = true)
+            .withSettings(backup.settings)
+            .withProgress(backup.progress)
+            .copy(statusBannerMessage = "Backup restored.")
+        _uiState.value = restored
+        repository.saveState(restored)
+        savedSettings = backup.settings
+        viewModelScope.launch {
+            settingsLock.withLock { settingsRepository.save(backup.settings) }
+        }
+        viewModelScope.launch {
+            historyLock.withLock { history.replaceAll(backup.history) }
+        }
+        // A backup from an earlier day: close that day and start today at 0.
+        // Its history write queues behind the restore above.
+        checkDayRollover()
+    }
+
+    private fun showMessage(message: String) {
+        _uiState.update { it.copy(statusBannerMessage = message) }
     }
 
     class Factory(

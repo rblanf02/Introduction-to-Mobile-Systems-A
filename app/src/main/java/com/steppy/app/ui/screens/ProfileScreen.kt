@@ -18,12 +18,17 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.steppy.app.data.backup.Backup
 import com.steppy.app.ui.Mascot
 import com.steppy.app.ui.SteppyUiState
+import com.steppy.app.ui.withProgress
+import com.steppy.app.ui.withSettings
 import com.steppy.app.ui.components.GoalEditDialog
 import com.steppy.app.ui.components.SteppyTopHeader
 import com.steppy.app.ui.theme.*
 import java.text.NumberFormat
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 @Composable
@@ -32,7 +37,9 @@ fun ProfileScreen(
     onUpdateGoal: (Int) -> Unit,
     onUpdateProfile: (String, Mascot) -> Unit,
     onToggleReminders: (Boolean) -> Unit,
-    onResetAllData: () -> Unit
+    onResetAllData: () -> Unit,
+    onBackupToFile: () -> Unit = {},
+    onRestoreFromFile: () -> Unit = {}
 ) {
     var showGoalDialog by remember { mutableStateOf(false) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -210,6 +217,18 @@ fun ProfileScreen(
                 HorizontalDivider(color = SteppyDivider)
 
                 SettingsRow(
+                    title = "Backup to file",
+                    onClick = onBackupToFile
+                )
+                HorizontalDivider(color = SteppyDivider)
+
+                SettingsRow(
+                    title = "Restore from file",
+                    onClick = onRestoreFromFile
+                )
+                HorizontalDivider(color = SteppyDivider)
+
+                SettingsRow(
                     title = "Privacy & security",
                     onClick = { showPrivacyDialog = true }
                 )
@@ -326,6 +345,51 @@ private fun EditProfileDialog(
                 modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
             ) {
                 Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+/** Asks before a backup replaces the current data (PROJECT_PLAN §5: imports always ask first). */
+@Composable
+fun RestoreConfirmDialog(
+    backup: Backup,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val formatter = remember { NumberFormat.getIntegerInstance(Locale.getDefault()) }
+    val dateFormatter = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }
+    val restored = remember(backup) {
+        SteppyUiState().withSettings(backup.settings).withProgress(backup.progress)
+    }
+    val days = backup.history.days.size
+    val streak = restored.currentStreak
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Replace your current progress?", fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                "Backup from ${backup.createdOn.format(dateFormatter)}: " +
+                    "${formatter.format(days)} ${if (days == 1) "day" else "days"} of history, " +
+                    "a ${formatter.format(streak)}-day streak and ${formatter.format(restored.totalXP)} XP.\n\n" +
+                    "Your current steps, streak, XP, challenges and settings will be replaced. This can't be undone."
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = SteppyErrorRed),
+                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            ) {
+                Text("Replace")
             }
         },
         dismissButton = {

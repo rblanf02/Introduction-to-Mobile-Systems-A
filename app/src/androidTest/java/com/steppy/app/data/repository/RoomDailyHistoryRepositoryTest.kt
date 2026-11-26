@@ -3,6 +3,8 @@ package com.steppy.app.data.repository
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.steppy.app.data.backup.HistoryData
+import com.steppy.app.data.local.DailyRecord
 import com.steppy.app.data.local.ProgressBaseline
 import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.local.SteppyDatabase
@@ -73,5 +75,30 @@ class RoomDailyHistoryRepositoryTest {
         assertNull(db.dailyRecordDao().get(monday))
         assertEquals(emptyList<UserChallenge>(), db.userChallengeDao().getAll())
         assertNull(db.progressBaselineDao().get())
+    }
+
+    @Test
+    fun replaceAll_swapsTheWholeHistory_andExportAllReadsItBack() = runBlocking {
+        history.saveDay(monday, 1234, 6000, StepSource.SENSOR)
+        db.userChallengeDao().upsert(UserChallenge("c5", monday, null))
+
+        val backup = HistoryData(
+            baseline = ProgressBaseline(asOf = monday.minusDays(10), xpBefore = 500, streakBefore = 3, heartsBefore = 1, activeDaysBefore = 7),
+            days = listOf(
+                DailyRecord(monday.minusDays(1), 9000, 2100, 8000, StepSource.MANUAL),
+                DailyRecord(monday, 4000, null, 8000, StepSource.SENSOR)
+            ),
+            challenges = listOf(UserChallenge("c1", monday.minusDays(1), monday))
+        )
+        history.replaceAll(backup)
+
+        assertEquals(backup, history.exportAll())
+    }
+
+    @Test
+    fun replaceAll_withEmptyHistory_leavesNothing() = runBlocking {
+        history.saveDay(monday, 1234, 6000, StepSource.SENSOR)
+        history.replaceAll(HistoryData(null, emptyList(), emptyList()))
+        assertEquals(HistoryData(null, emptyList(), emptyList()), history.exportAll())
     }
 }

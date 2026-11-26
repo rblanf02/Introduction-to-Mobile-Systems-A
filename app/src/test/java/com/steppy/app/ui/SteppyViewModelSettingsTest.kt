@@ -1,5 +1,6 @@
 package com.steppy.app.ui
 
+import com.steppy.app.data.backup.HistoryData
 import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.SteppyRepository
@@ -45,6 +46,8 @@ class SteppyViewModelSettingsTest {
     private object NoHistory : DailyHistoryRepository {
         override suspend fun saveDay(date: LocalDate, steps: Int, goal: Int, source: StepSource) = Unit
         override suspend fun clearAll() = Unit
+        override suspend fun exportAll() = HistoryData(null, emptyList(), emptyList())
+        override suspend fun replaceAll(data: HistoryData) = Unit
     }
 
     private val monday = LocalDate.of(2026, 11, 23)

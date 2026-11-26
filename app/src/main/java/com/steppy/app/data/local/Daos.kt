@@ -34,6 +34,10 @@ interface DailyRecordDao {
     @Query("SELECT * FROM daily_records WHERE date >= :from ORDER BY date")
     fun observeFrom(from: LocalDate): Flow<List<DailyRecord>>
 
+    /** Every day, oldest first. Used by the backup. */
+    @Query("SELECT * FROM daily_records ORDER BY date")
+    suspend fun getAll(): List<DailyRecord>
+
     @Query("DELETE FROM daily_records")
     suspend fun deleteAll()
 }
@@ -43,6 +47,9 @@ interface UserChallengeDao {
 
     @Upsert
     suspend fun upsert(challenge: UserChallenge)
+
+    @Upsert
+    suspend fun upsertAll(challenges: List<UserChallenge>)
 
     @Query("SELECT * FROM user_challenges WHERE challengeId = :id")
     suspend fun get(id: String): UserChallenge?
