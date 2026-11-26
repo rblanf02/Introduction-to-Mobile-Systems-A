@@ -5,6 +5,7 @@ import com.steppy.app.data.local.DailyRecord
 import com.steppy.app.data.local.ProgressBaseline
 import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.local.UserChallenge
+import com.steppy.app.data.local.mergedWith
 import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.SteppyRepository
 import com.steppy.app.data.repository.replayStreakBefore
@@ -45,7 +46,9 @@ class SteppyViewModelBackupTest {
     private class FakeHistory(var data: HistoryData = HistoryData(null, emptyList(), emptyList())) :
         DailyHistoryRepository {
         override suspend fun saveDay(date: LocalDate, steps: Int, goal: Int, source: StepSource) {
-            val record = DailyRecord(date, steps, null, goal, source)
+            // Same rule as the Room repository: a MANUAL day stays MANUAL
+            val earlier = data.days.firstOrNull { it.date == date }?.source
+            val record = DailyRecord(date, steps, null, goal, source.mergedWith(earlier))
             data = data.copy(
                 baseline = data.baseline ?: ProgressBaseline.newUser(date),
                 days = (data.days.filter { it.date != date } + record).sortedBy { it.date }

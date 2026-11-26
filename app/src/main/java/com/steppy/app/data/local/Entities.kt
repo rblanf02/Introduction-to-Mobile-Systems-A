@@ -6,7 +6,15 @@ import com.steppy.app.domain.DayProgress
 import com.steppy.app.domain.StreakState
 import java.time.LocalDate
 
+/**
+ * How a day's steps were counted. MANUAL means some steps were entered by hand, or the
+ * sensor wasn't counting (no sensor, or permission denied) at some point that day.
+ */
 enum class StepSource { SENSOR, MANUAL }
+
+/** A day that was MANUAL at any point stays MANUAL; later sensor updates never change it back. */
+fun StepSource.mergedWith(earlier: StepSource?): StepSource =
+    if (earlier == StepSource.MANUAL) StepSource.MANUAL else this
 
 /** One row per day. Streak, hearts, XP and the charts are calculated from these rows. */
 @Entity(tableName = "daily_records")

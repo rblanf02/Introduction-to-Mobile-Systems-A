@@ -66,4 +66,12 @@ class EntitiesTest {
         )
         assertEquals(StreakState(streak = 210, hearts = 2), baseline.toStreakState())
     }
+
+    @Test
+    fun stepSource_manualDayStaysManual() {
+        assertEquals(StepSource.SENSOR, StepSource.SENSOR.mergedWith(null))
+        assertEquals(StepSource.SENSOR, StepSource.SENSOR.mergedWith(StepSource.SENSOR))
+        assertEquals(StepSource.MANUAL, StepSource.MANUAL.mergedWith(StepSource.SENSOR))
+        assertEquals(StepSource.MANUAL, StepSource.SENSOR.mergedWith(StepSource.MANUAL))
+    }
 }

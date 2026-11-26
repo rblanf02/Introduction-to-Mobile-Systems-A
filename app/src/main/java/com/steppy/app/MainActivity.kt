@@ -49,7 +49,10 @@ class MainActivity : ComponentActivity() {
                             refreshKey = sensorRefreshKey,
                             onSensorSteps = steppyViewModel::onSensorStepsUpdated,
                             simulatedCounter = container.simulatedCounter,
-                            onTrackingChanged = { tracking -> sensorIsTracking = tracking }
+                            onTrackingChanged = { tracking ->
+                                sensorIsTracking = tracking
+                                steppyViewModel.onStepTrackingChanged(tracking)
+                            }
                         )
                     }
                 )

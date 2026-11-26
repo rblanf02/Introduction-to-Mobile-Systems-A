@@ -6,6 +6,7 @@ import com.steppy.app.data.local.DailyRecord
 import com.steppy.app.data.local.ProgressBaseline
 import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.local.SteppyDatabase
+import com.steppy.app.data.local.mergedWith
 import com.steppy.app.data.local.toDayProgress
 import com.steppy.app.data.local.toStreakState
 import com.steppy.app.domain.StreakCalculator
@@ -17,7 +18,8 @@ interface DailyHistoryRepository {
 
     /**
      * Creates or updates the record for [date]. The first record ever saved also creates
-     * the new-user [ProgressBaseline], starting on that date.
+     * the new-user [ProgressBaseline], starting on that date. A day saved as MANUAL once
+     * stays MANUAL (see [com.steppy.app.data.local.mergedWith]).
      */
     suspend fun saveDay(date: LocalDate, steps: Int, goal: Int, source: StepSource)
 
@@ -66,7 +68,7 @@ class RoomDailyHistoryRepository(private val db: SteppyDatabase) : DailyHistoryR
                     // Written by the snapshot worker (P4), so keep it
                     stepsBeforeNoon = existing?.stepsBeforeNoon,
                     goal = goal,
-                    source = source
+                    source = source.mergedWith(existing?.source)
                 )
             )
         }

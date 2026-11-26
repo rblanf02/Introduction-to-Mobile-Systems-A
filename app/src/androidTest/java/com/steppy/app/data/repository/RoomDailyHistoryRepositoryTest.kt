@@ -101,4 +101,12 @@ class RoomDailyHistoryRepositoryTest {
         history.replaceAll(HistoryData(null, emptyList(), emptyList()))
         assertEquals(HistoryData(null, emptyList(), emptyList()), history.exportAll())
     }
+
+    @Test
+    fun manualDay_staysManual_whenSensorStepsAreSavedLater() = runBlocking {
+        history.saveDay(monday, 500, 6000, StepSource.MANUAL)
+        history.saveDay(monday, 4000, 6000, StepSource.SENSOR)
+        assertEquals(StepSource.MANUAL, db.dailyRecordDao().get(monday)?.source)
+        assertEquals(4000, db.dailyRecordDao().get(monday)?.steps)
+    }
 }

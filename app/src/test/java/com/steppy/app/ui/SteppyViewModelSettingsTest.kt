@@ -155,4 +155,18 @@ class SteppyViewModelSettingsTest {
             settings.settings
         )
     }
+
+    @Test
+    fun sensorReportBeforeSettingsAreRead_isAppliedOnceLoaded() {
+        val ready = CompletableDeferred<Unit>()
+        val settings = FakeSettingsRepository(onboarded.copy(isManualMode = true), ready)
+        val vm = viewModel(FakeProgress(SteppyUiState(todayDate = monday)), settings)
+
+        vm.onStepTrackingChanged(true)
+        assertEquals(0, settings.saves)
+
+        ready.complete(Unit)
+        assertFalse(vm.uiState.value.isManualMode)
+        assertFalse(settings.settings.isManualMode)
+    }
 }

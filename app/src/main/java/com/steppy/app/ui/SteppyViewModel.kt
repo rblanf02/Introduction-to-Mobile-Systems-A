@@ -61,12 +61,16 @@ class SteppyViewModel(
     /** Null until the history has been read for the current day. */
     private var streakBase: StreakBase? = null
 
+    /** The last state reported by the step sensor, or null before the first report. */
+    private var sensorTracking: Boolean? = null
+
     init {
         viewModelScope.launch {
             val settings = settingsRepository.load()
             savedSettings = settings
             _uiState.update { it.withSettings(settings).copy(isLoaded = true) }
             rollOverIfNewDay()
+            applySensorTracking()
             refreshStreak()
         }
     }
@@ -103,13 +107,17 @@ class SteppyViewModel(
         }
     }
 
-    private fun updateAndPersist(transform: (SteppyUiState) -> SteppyUiState) {
+    /** @param source how the steps in this update were counted; null when no steps were added */
+    private fun updateAndPersist(
+        source: StepSource? = null,
+        transform: (SteppyUiState) -> SteppyUiState
+    ) {
         // Saving before the settings are read would overwrite them with the defaults
         if (!_uiState.value.isLoaded) return
         val updated = _uiState.updateAndGet(transform)
         repository.saveState(updated)
         saveSettingsIfChanged(updated.settings())
-        saveTodayRecord(updated)
+        saveTodayRecord(updated, source)
     }
 
     private fun saveSettingsIfChanged(settings: UserSettings) {
@@ -120,14 +128,18 @@ class SteppyViewModel(
         }
     }
 
-    private fun stepSource(state: SteppyUiState): StepSource =
-        if (state.isManualMode) StepSource.MANUAL else StepSource.SENSOR
+    /**
+     * MANUAL when [added] steps were entered by hand, or when the sensor isn't counting.
+     * The history keeps a day MANUAL once it was, so a later SENSOR save doesn't undo it.
+     */
+    private fun stepSource(state: SteppyUiState, added: StepSource? = null): StepSource =
+        if (added == StepSource.MANUAL || state.isManualMode) StepSource.MANUAL else StepSource.SENSOR
 
     /** Saves today's steps with today's goal, so a later goal change never rewrites past days. */
-    private fun saveTodayRecord(state: SteppyUiState) {
+    private fun saveTodayRecord(state: SteppyUiState, added: StepSource? = null) {
         val date = state.todayDate ?: return
         if (!state.isOnboardingCompleted) return
-        saveRecord(date, state.todaySteps, state.dailyGoal, stepSource(state))
+        saveRecord(date, state.todaySteps, state.dailyGoal, stepSource(state, added))
     }
 
     private fun saveRecord(date: LocalDate, steps: Int, goal: Int, source: StepSource) {
@@ -207,10 +219,15 @@ class SteppyViewModel(
         }
     }
 
+    /** Steps the user entered by hand ("+ Log steps"); the day is saved as MANUAL. */
     fun addSteps(stepsToAdd: Int) {
+        addSteps(stepsToAdd, StepSource.MANUAL)
+    }
+
+    private fun addSteps(stepsToAdd: Int, source: StepSource) {
         if (stepsToAdd <= 0 || !_uiState.value.isLoaded) return
         checkDayRollover()
-        updateAndPersist { state ->
+        updateAndPersist(source) { state ->
             val wasGoalMet = state.isTodayGoalMet
             val newSteps = (state.todaySteps + stepsToAdd).coerceAtMost(200000)
             val isNowGoalMet = newSteps >= state.dailyGoal
@@ -254,7 +271,27 @@ class SteppyViewModel(
         // On a new day the sensor count drops back to a low value; start today at 0 first
         checkDayRollover()
         val diff = totalTodayStepsFromSensor - _uiState.value.todaySteps
-        if (diff > 0) addSteps(diff)
+        if (diff > 0) addSteps(diff, StepSource.SENSOR)
+    }
+
+    /**
+     * Whether the step sensor is counting. When it isn't (no sensor, or the permission is
+     * denied), manual mode turns on, so Today offers manual entry and the day is saved as MANUAL.
+     * When the permission is granted later, manual mode turns off again.
+     */
+    fun onStepTrackingChanged(isTracking: Boolean) {
+        sensorTracking = isTracking
+        applySensorTracking()
+    }
+
+    private fun applySensorTracking() {
+        val isTracking = sensorTracking ?: return
+        val state = _uiState.value
+        // Before onboarding ends, the choice made there decides
+        if (!state.isLoaded || !state.isOnboardingCompleted) return
+        if (state.isManualMode != !isTracking) {
+            updateAndPersist { it.copy(isManualMode = !isTracking) }
+        }
     }
 
     fun activateChallenge(challengeId: String) {
@@ -395,6 +432,8 @@ class SteppyViewModel(
         // A backup from an earlier day: close that day and start today at 0.
         // Its history write queues behind the restore above.
         rollOverIfNewDay()
+        // The backup's manual mode came from the other phone; this phone's sensor decides
+        applySensorTracking()
         // The streak comes from the restored history, read after the writes above
         refreshStreak()
     }

@@ -4,6 +4,7 @@ import com.steppy.app.data.backup.HistoryData
 import com.steppy.app.data.local.DailyRecord
 import com.steppy.app.data.local.ProgressBaseline
 import com.steppy.app.data.local.StepSource
+import com.steppy.app.data.local.mergedWith
 import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.SteppyRepository
 import com.steppy.app.data.repository.replayStreakBefore
@@ -18,6 +19,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -34,7 +36,8 @@ class SteppyViewModelHistoryTest {
         var baseline: ProgressBaseline? = null
         override suspend fun saveDay(date: LocalDate, steps: Int, goal: Int, source: StepSource) {
             if (baseline == null) baseline = ProgressBaseline.newUser(date)
-            days[date] = SavedDay(steps, goal, source)
+            // Same rule as the Room repository
+            days[date] = SavedDay(steps, goal, source.mergedWith(days[date]?.source))
         }
         override suspend fun clearAll() { days.clear(); baseline = null }
         override suspend fun exportAll() = HistoryData(null, emptyList(), emptyList())
@@ -93,10 +96,10 @@ class SteppyViewModelHistoryTest {
     }
 
     @Test
-    fun addingSteps_updatesTodaysRecord() {
+    fun sensorSteps_updateTodaysRecord() {
         val vm = viewModel(FakeSettings(onboardedState()))
-        vm.addSteps(2500)
-        vm.addSteps(500)
+        vm.onSensorStepsUpdated(2500)
+        vm.onSensorStepsUpdated(3000)
         assertEquals(SavedDay(3000, 6000, StepSource.SENSOR), history.days[monday])
     }
 
@@ -106,7 +109,7 @@ class SteppyViewModelHistoryTest {
         vm.addSteps(4000)
 
         clock = tuesday
-        vm.addSteps(1000)
+        vm.onSensorStepsUpdated(1000)
         vm.updateDailyGoal(10000)
 
         assertEquals(6000, history.days[monday]?.goal)
@@ -271,5 +274,64 @@ class SteppyViewModelHistoryTest {
         // Not onboarded: nothing is saved to the history, so there's nothing to replay
         val vm = viewModel(FakeSettings(SteppyUiState(todayDate = monday, currentStreak = 3)))
         assertEquals(3, vm.uiState.value.currentStreak)
+    }
+
+    // Manual entry and the day's step source (P3)
+
+    @Test
+    fun manualEntry_savesTheDayAsManual() {
+        val vm = viewModel(FakeSettings(onboardedState()))
+        vm.addSteps(1200)
+        assertEquals(SavedDay(1200, 6000, StepSource.MANUAL), history.days[monday])
+    }
+
+    @Test
+    fun sensorStepsAfterManualEntry_dayStaysManual() {
+        val vm = viewModel(FakeSettings(onboardedState()))
+        vm.onSensorStepsUpdated(1000)
+        vm.addSteps(500)
+        vm.onSensorStepsUpdated(4000)
+
+        assertEquals(SavedDay(4000, 6000, StepSource.MANUAL), history.days[monday])
+
+        // The next day starts as a sensor day again
+        clock = tuesday
+        vm.onSensorStepsUpdated(200)
+        assertEquals(StepSource.SENSOR, history.days[tuesday]?.source)
+    }
+
+    @Test
+    fun sensorNotCounting_turnsOnManualMode_andTheDayIsManual() {
+        val settings = FakeSettings(onboardedState())
+        val vm = viewModel(settings)
+
+        // No sensor, or the permission was denied in the system settings
+        vm.onStepTrackingChanged(false)
+
+        assertTrue(vm.uiState.value.isManualMode)
+        assertTrue(settings.saved.isManualMode)
+        assertEquals(StepSource.MANUAL, history.days[monday]?.source)
+    }
+
+    @Test
+    fun permissionGrantedLater_turnsOffManualMode() {
+        val vm = viewModel(FakeSettings(onboardedState().copy(isManualMode = true)))
+
+        vm.onStepTrackingChanged(true)
+        assertFalse(vm.uiState.value.isManualMode)
+
+        clock = tuesday
+        vm.onSensorStepsUpdated(800)
+        assertEquals(SavedDay(800, 6000, StepSource.SENSOR), history.days[tuesday])
+    }
+
+    @Test
+    fun sensorReportBeforeOnboardingEnds_doesNotOverrideTheOnboardingChoice() {
+        val vm = viewModel(FakeSettings(SteppyUiState()))
+        vm.onStepTrackingChanged(false)
+        assertFalse(vm.uiState.value.isManualMode)
+
+        vm.completeOnboarding(manualFallbackMode = false)
+        assertFalse(vm.uiState.value.isManualMode)
     }
 }
