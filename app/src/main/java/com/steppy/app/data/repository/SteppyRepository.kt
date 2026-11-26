@@ -2,10 +2,11 @@ package com.steppy.app.data.repository
 
 import android.content.Context
 import com.steppy.app.domain.ActivityLevel
+import com.steppy.app.domain.ChallengeProgressInputs
 import com.steppy.app.domain.MainMotivation
 import com.steppy.app.ui.Mascot
 import com.steppy.app.ui.SteppyUiState
-import com.steppy.app.ui.defaultChallenges
+import com.steppy.app.ui.catalogueChallenges
 import com.steppy.app.ui.defaultWeeklyBars
 import java.time.LocalDate
 
@@ -47,7 +48,13 @@ class LocalSteppyRepository(context: Context) : SteppyRepository {
         val activeIds = prefs.getStringSet("active_challenges", emptySet()) ?: setOf("c1", "c2")
         val completedIds = prefs.getStringSet("completed_challenges", emptySet()) ?: emptySet()
 
-        val challenges = defaultChallenges(steps, streak, steps).map { item ->
+        val progressInputs = ChallengeProgressInputs.forToday(
+            date = stepsDate ?: LocalDate.now(),
+            todaySteps = steps,
+            streak = streak,
+            weekSteps = steps
+        )
+        val challenges = catalogueChallenges(progressInputs).map { item ->
             val completed = completedIds.contains(item.id)
             item.copy(
                 isActive = activeIds.contains(item.id),

@@ -13,14 +13,19 @@ object Suggestions {
         ActivityLevel.VERY_ACTIVE -> 10000
     }
 
-    /** Challenge ids shown first for each main goal, in this order. Ids match the built-in catalogue. */
+    /** Challenge ids shown first for each main goal, in this order. */
     private fun firstChallengeIds(mainGoal: MainMotivation): List<String> = when (mainGoal) {
-        // Step challenges: 10K Steps, 50K This Week, Weekend Walker
-        MainMotivation.MOVE_MORE -> listOf("c1", "c4", "c3")
-        // 7-Day Streak
-        MainMotivation.BUILD_STREAK -> listOf("c2")
-        // Everyday habits: Morning Mover, 10K Steps
-        MainMotivation.STAY_HEALTHY -> listOf("c5", "c1")
+        MainMotivation.MOVE_MORE -> listOf(
+            ChallengeCatalogue.TEN_K_STEPS,
+            ChallengeCatalogue.FIFTY_K_WEEK,
+            ChallengeCatalogue.WEEKEND_WALKER
+        )
+        MainMotivation.BUILD_STREAK -> listOf(ChallengeCatalogue.SEVEN_DAY_STREAK)
+        // Everyday habits
+        MainMotivation.STAY_HEALTHY -> listOf(
+            ChallengeCatalogue.MORNING_MOVER,
+            ChallengeCatalogue.TEN_K_STEPS
+        )
     }
 
     /**

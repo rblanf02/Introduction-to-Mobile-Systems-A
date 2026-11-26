@@ -8,8 +8,10 @@ import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.SteppyRepository
 import com.steppy.app.domain.ActivationResult
 import com.steppy.app.domain.ActivityLevel
+import com.steppy.app.domain.ChallengeCatalogue
 import com.steppy.app.domain.ChallengeEvaluation
 import com.steppy.app.domain.ChallengeEvaluator
+import com.steppy.app.domain.ChallengeProgressInputs
 import com.steppy.app.domain.MainMotivation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -131,11 +133,13 @@ class SteppyViewModel(
             val newStreak = if (!wasGoalMet && isNowGoalMet) state.currentStreak + 1 else state.currentStreak
             val newWeeklyTotal = state.weeklyBars.filter { !it.isToday }.sumOf { it.steps } + newSteps
 
-            val progressById = mapOf(
-                "c1" to newSteps,
-                "c2" to newStreak,
-                "c4" to newWeeklyTotal,
-                "c5" to newSteps.coerceAtMost(2000)
+            val progressById = ChallengeCatalogue.progressById(
+                ChallengeProgressInputs.forToday(
+                    date = state.todayDate ?: today(),
+                    todaySteps = newSteps,
+                    streak = newStreak,
+                    weekSteps = newWeeklyTotal
+                )
             )
             val evaluation = ChallengeEvaluator.evaluate(
                 state.challenges.map { it.toChallengeState() },
