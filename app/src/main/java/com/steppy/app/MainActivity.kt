@@ -24,7 +24,11 @@ class MainActivity : ComponentActivity() {
     private val container by lazy { (application as SteppyApplication).container }
 
     private val steppyViewModel: SteppyViewModel by viewModels {
-        SteppyViewModel.Factory(container.steppyRepository, container.dailyHistoryRepository)
+        SteppyViewModel.Factory(
+            container.steppyRepository,
+            container.settingsRepository,
+            container.dailyHistoryRepository
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

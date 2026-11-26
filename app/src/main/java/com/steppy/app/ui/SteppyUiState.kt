@@ -1,5 +1,6 @@
 package com.steppy.app.ui
 
+import com.steppy.app.data.settings.UserSettings
 import com.steppy.app.domain.ActivityLevel
 import com.steppy.app.domain.ChallengeCatalogue
 import com.steppy.app.domain.ChallengeDefinition
@@ -71,8 +72,10 @@ data class DayBarUi(
 }
 
 data class SteppyUiState(
+    /** False until the settings have been read from storage; nothing is shown or saved before. */
+    val isLoaded: Boolean = false,
     val isOnboardingCompleted: Boolean = false,
-    val username: String = "Aitor",
+    val username: String = "Walker",
     val dateLabel: String = "Tuesday, May 21",
     val motivation: MainMotivation = MainMotivation.MOVE_MORE,
     val activityLevel: ActivityLevel = ActivityLevel.SOMEWHAT_ACTIVE,
@@ -124,6 +127,30 @@ data class SteppyUiState(
     val levelProgressFraction: Float
         get() = levelProgress.fraction
 }
+
+/** The part of the state kept in [com.steppy.app.data.settings.SettingsRepository]. */
+fun SteppyUiState.settings(): UserSettings = UserSettings(
+    isOnboardingCompleted = isOnboardingCompleted,
+    username = username,
+    mascot = selectedMascot,
+    mainGoal = motivation,
+    activityLevel = activityLevel,
+    dailyGoal = dailyGoal,
+    isManualMode = isManualMode,
+    remindersEnabled = remindersEnabled
+)
+
+fun SteppyUiState.withSettings(settings: UserSettings): SteppyUiState = copy(
+    isOnboardingCompleted = settings.isOnboardingCompleted,
+    username = settings.username,
+    selectedMascot = settings.mascot,
+    motivation = settings.mainGoal,
+    activityLevel = settings.activityLevel,
+    dailyGoal = settings.dailyGoal,
+    isManualMode = settings.isManualMode,
+    remindersEnabled = settings.remindersEnabled,
+    weeklyBars = defaultWeeklyBars(settings.dailyGoal, todaySteps)
+)
 
 fun defaultWeeklyBars(goal: Int, todaySteps: Int): List<DayBarUi> = listOf(
     DayBarUi("L", "Monday", 0, goal),

@@ -1,6 +1,10 @@
 package com.steppy.app.ui.navigation
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -29,7 +33,10 @@ fun SteppyApp(viewModel: SteppyViewModel,
         }
     }
 
-    if (!uiState.isOnboardingCompleted) {
+    if (!uiState.isLoaded) {
+        // Reading the settings takes a few milliseconds; show an empty screen, not onboarding
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+    } else if (!uiState.isOnboardingCompleted) {
         OnboardingFlowScreen(
             uiState = uiState,
             onSaveSetup = viewModel::saveProfileSetup,

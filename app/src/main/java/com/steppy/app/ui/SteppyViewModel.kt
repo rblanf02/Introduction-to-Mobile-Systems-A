@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.SteppyRepository
+import com.steppy.app.data.settings.SettingsRepository
+import com.steppy.app.data.settings.UserSettings
 import com.steppy.app.domain.ActivationResult
 import com.steppy.app.domain.ActivityLevel
 import com.steppy.app.domain.ChallengeCatalogue
@@ -25,6 +27,7 @@ import java.time.LocalDate
 
 class SteppyViewModel(
     private val repository: SteppyRepository,
+    private val settingsRepository: SettingsRepository,
     private val history: DailyHistoryRepository,
     private val today: () -> LocalDate = { LocalDate.now() }
 ) : ViewModel() {
@@ -35,14 +38,36 @@ class SteppyViewModel(
     /** Runs history writes one at a time, in order, so an older value never overwrites a newer one. */
     private val historyLock = Mutex()
 
+    /** Runs settings writes one at a time, in order. */
+    private val settingsLock = Mutex()
+
+    /** The settings last read or written, so unchanged settings are not written again. */
+    private var savedSettings: UserSettings? = null
+
     init {
-        checkDayRollover()
+        viewModelScope.launch {
+            val settings = settingsRepository.load()
+            savedSettings = settings
+            _uiState.update { it.withSettings(settings).copy(isLoaded = true) }
+            checkDayRollover()
+        }
     }
 
     private fun updateAndPersist(transform: (SteppyUiState) -> SteppyUiState) {
+        // Saving before the settings are read would overwrite them with the defaults
+        if (!_uiState.value.isLoaded) return
         val updated = _uiState.updateAndGet(transform)
         repository.saveState(updated)
+        saveSettingsIfChanged(updated.settings())
         saveTodayRecord(updated)
+    }
+
+    private fun saveSettingsIfChanged(settings: UserSettings) {
+        if (settings == savedSettings) return
+        savedSettings = settings
+        viewModelScope.launch {
+            settingsLock.withLock { settingsRepository.save(settings) }
+        }
     }
 
     private fun stepSource(state: SteppyUiState): StepSource =
@@ -69,6 +94,8 @@ class SteppyViewModel(
     fun checkDayRollover() {
         val now = today()
         val state = _uiState.value
+        // Runs again once loading ends
+        if (!state.isLoaded) return
         val countedDate = state.todayDate
 
         if (countedDate == null) {
@@ -124,7 +151,7 @@ class SteppyViewModel(
     }
 
     fun addSteps(stepsToAdd: Int) {
-        if (stepsToAdd <= 0) return
+        if (stepsToAdd <= 0 || !_uiState.value.isLoaded) return
         checkDayRollover()
         updateAndPersist { state ->
             val wasGoalMet = state.isTodayGoalMet
@@ -165,7 +192,8 @@ class SteppyViewModel(
     }
 
     fun onSensorStepsUpdated(totalTodayStepsFromSensor: Int) {
-        if (totalTodayStepsFromSensor < 0) return
+        // Before loading ends the sensor value is dropped; the sensor sends it again
+        if (totalTodayStepsFromSensor < 0 || !_uiState.value.isLoaded) return
         // On a new day the sensor count drops back to a low value; start today at 0 first
         checkDayRollover()
         val diff = totalTodayStepsFromSensor - _uiState.value.todaySteps
@@ -234,7 +262,11 @@ class SteppyViewModel(
 
     fun resetAllData() {
         repository.clearAllData()
-        _uiState.value = SteppyUiState(isOnboardingCompleted = false, todayDate = today())
+        _uiState.value = SteppyUiState(isLoaded = true, todayDate = today())
+        savedSettings = UserSettings()
+        viewModelScope.launch {
+            settingsLock.withLock { settingsRepository.clear() }
+        }
         viewModelScope.launch {
             historyLock.withLock { history.clearAll() }
         }
@@ -242,11 +274,12 @@ class SteppyViewModel(
 
     class Factory(
         private val repository: SteppyRepository,
+        private val settingsRepository: SettingsRepository,
         private val history: DailyHistoryRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return SteppyViewModel(repository, history) as T
+            return SteppyViewModel(repository, settingsRepository, history) as T
         }
     }
 }

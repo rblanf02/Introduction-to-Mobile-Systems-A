@@ -3,6 +3,8 @@ package com.steppy.app.ui
 import com.steppy.app.data.local.StepSource
 import com.steppy.app.data.repository.DailyHistoryRepository
 import com.steppy.app.data.repository.SteppyRepository
+import com.steppy.app.data.settings.SettingsRepository
+import com.steppy.app.data.settings.UserSettings
 import com.steppy.app.domain.ActivityLevel
 import com.steppy.app.domain.MainMotivation
 import kotlinx.coroutines.Dispatchers
@@ -31,10 +33,17 @@ class SteppyViewModelHistoryTest {
         override suspend fun clearAll() = days.clear()
     }
 
+    /** Progress and settings together; the settings part is served through a fake SettingsRepository. */
     private class FakeSettings(var saved: SteppyUiState) : SteppyRepository {
         override fun loadInitialState(): SteppyUiState = saved
         override fun saveState(state: SteppyUiState) { saved = state }
         override fun clearAllData() { saved = SteppyUiState() }
+    }
+
+    private class FakeSettingsRepository(var settings: UserSettings) : SettingsRepository {
+        override suspend fun load() = settings
+        override suspend fun save(settings: UserSettings) { this.settings = settings }
+        override suspend fun clear() { settings = UserSettings() }
     }
 
     private val monday = LocalDate.of(2026, 11, 23)
@@ -46,7 +55,8 @@ class SteppyViewModelHistoryTest {
     private fun onboardedState(todayDate: LocalDate? = monday, steps: Int = 0, goal: Int = 6000) =
         SteppyUiState(isOnboardingCompleted = true, todayDate = todayDate, todaySteps = steps, dailyGoal = goal)
 
-    private fun viewModel(settings: FakeSettings) = SteppyViewModel(settings, history) { clock }
+    private fun viewModel(settings: FakeSettings) =
+        SteppyViewModel(settings, FakeSettingsRepository(settings.saved.settings()), history) { clock }
 
     @Before
     fun setUp() {
