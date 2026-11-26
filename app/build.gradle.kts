@@ -36,6 +36,8 @@ android {
     }
     buildFeatures {
         compose = true
+        // BuildConfig.DEBUG turns the demo helpers on in debug builds only (DebugFlags)
+        buildConfig = true
     }
 }
 
